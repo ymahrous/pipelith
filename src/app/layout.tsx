@@ -1,0 +1,109 @@
+import "@fontsource-variable/archivo/wdth.css";
+import "@fontsource-variable/jetbrains-mono";
+import "./globals.css";
+
+import type { Metadata, Viewport } from "next";
+import Link from "next/link";
+import { headers } from "next/headers";
+import { BrandMark } from "@/components/Brand";
+import { SiteNav } from "@/components/SiteNav";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SessionProvider } from "@/components/SessionProvider";
+import { VercelMetrics } from "@/components/VercelMetrics";
+import { JsonLd } from "@/components/JsonLd";
+import { metricsEnabled, SITE } from "@/lib/site";
+
+export const metadata: Metadata = {
+  metadataBase: new URL(SITE.url),
+  title: { default: `${SITE.name} — ${SITE.tagline}`, template: `%s · ${SITE.name}` },
+  description: SITE.description,
+  applicationName: SITE.name,
+  authors: [{ name: SITE.author }],
+  creator: SITE.author,
+  keywords: [
+    "pipelined processor",
+    "RISC processor",
+    "VHDL code review",
+    "VHDL linter",
+    "processor verification",
+    "5-stage pipeline",
+    "6-stage pipeline",
+    "data forwarding",
+    "hazard detection",
+    "GHDL",
+    "ModelSim",
+    "VCD waveform comparison",
+    "instruction set simulator",
+    "computer architecture",
+    "Pipelith",
+    "pipeline verification",
+  ],
+  category: "technology",
+  referrer: "no-referrer",
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large" } },
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: SITE.name,
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.description,
+    url: "/",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE.name} — ${SITE.tagline}`,
+    description: SITE.description,
+  },
+  formatDetection: { telephone: false, email: false, address: false },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#edf1ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c2124" },
+  ],
+};
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading headers opts every page into per-request rendering, which the CSP nonce needs.
+  await headers();
+  return (
+    <html lang="en">
+      <body>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
+        <header className="site-header">
+          <div className="site-header__inner">
+            <Link href="/" className="brand">
+              <BrandMark />
+              <span className="brand__name">{SITE.name}</span>
+            </Link>
+            <SiteNav />
+          </div>
+        </header>
+        <main id="main">
+          <SessionProvider>{children}</SessionProvider>
+        </main>
+        <SiteFooter />
+        <JsonLd
+          data={{
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: SITE.name,
+            alternateName: "Pipelith pipeline verification",
+            slogan: SITE.tagline,
+            url: SITE.url + "/",
+            description: SITE.description,
+            inLanguage: "en",
+            publisher: { "@type": "Person", name: SITE.author },
+          }}
+        />
+        {metricsEnabled() && <VercelMetrics />}
+      </body>
+    </html>
+  );
+}

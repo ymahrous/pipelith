@@ -1,0 +1,160 @@
+/** Report export: Markdown for people, JSON for CI and scripts. */
+import { BRAND } from "../site";
+import { describeCheck } from "../check/expectations";
+import { judgeTiming, type CompareReport } from "../compare/compare";
+import { describeForwarding, geometry } from "../pipeline/pipeline";
+import type { FinalReport } from "../compare/finalValues";
+import type { Analysis } from "../session/analyze";
+import type { Session } from "../session/session";
+import { flagsToString } from "../sim/simulator";
+import { hex } from "../asm/assembler";
+
+export interface ReportData {
+  generatedAt: string;
+  program: string;
+  processor: string;
+  pipeline: { stages: number; forwarding: string; estimatedCycles: number | null; cpi: number | null; stalls: Record<string, number> | null; hardwareCycles: number | null; timingVerdict: string | null };
+  options: Session["options"];
+  assembly: { words: number; errors: number; warnings: number; diagnostics: { line: number; severity: string; message: string }[] };
+  simulation: null | { steps: number; halt: string; finalRegisters: string[]; sp: string; flags: string; out: string | null; warnings: string[] };
+  checks: { total: number; passed: number; failed: number; notRun: number; items: { line: number; check: string; status: string; actual: string; note?: string }[] };
+  hardware: null | {
+    passed: number;
+    failed: number;
+    firstDivergence: string | null;
+    channels: { channel: string; signal: string | null; status: string; summary: string }[];
+  };
+  finalValues: null | { passed: number; failed: number; rows: { register: string; model: string; hardware: string; status: string }[] };
+}
+
+export function buildReport(
+  s: Session,
+  a: Analysis,
+  cmp: CompareReport | null,
+  now = new Date(),
+  finals: FinalReport | null = null,
+): ReportData {
+  const errors = a.diagnostics.filter((d) => d.severity === "error").length;
+  const warnings = a.diagnostics.filter((d) => d.severity === "warning").length;
+  const r = a.checkResults;
+  return {
+    generatedAt: now.toISOString(),
+    program: s.name,
+    processor: a.profile.name,
+    pipeline: {
+      stages: s.stages,
+      forwarding: describeForwarding(geometry(s.stages), s.forwarding),
+      estimatedCycles: a.timing?.totalCycles ?? null,
+      cpi: a.timing ? +a.timing.cpi.toFixed(2) : null,
+      stalls: a.timing ? { ...a.timing.stalls } : null,
+      hardwareCycles: cmp?.lastChangeCycle ?? null,
+      timingVerdict:
+        cmp?.lastChangeCycle != null && a.timing
+          ? judgeTiming(cmp.lastChangeCycle, a.timing.lastResultCycle, s.stages, s.forwarding).message
+          : null,
+    },
+    options: s.options,
+    assembly: {
+      words: a.memory.size,
+      errors,
+      warnings,
+      diagnostics: a.diagnostics.map((d) => ({ line: d.line, severity: d.severity, message: d.message })),
+    },
+    simulation: a.sim
+      ? {
+          steps: a.sim.events.length,
+          halt: a.sim.haltReason,
+          finalRegisters: a.sim.final.regs.map((v) => hex(v)),
+          sp: hex(a.sim.final.sp, 3),
+          flags: flagsToString(a.sim.final.flags),
+          out: a.sim.final.out === null ? null : hex(a.sim.final.out),
+          warnings: a.sim.warnings,
+        }
+      : null,
+    checks: {
+      total: r.length,
+      passed: r.filter((x) => x.status === "pass").length,
+      failed: r.filter((x) => x.status === "fail").length,
+      notRun: r.filter((x) => x.status === "not-run").length,
+      items: r.map((x) => ({
+        line: x.check.line,
+        check: describeCheck(x.check),
+        status: x.status,
+        actual: x.actual,
+        note: x.message,
+      })),
+    },
+    hardware: cmp
+      ? {
+          passed: cmp.passed,
+          failed: cmp.failed,
+          firstDivergence: cmp.firstDivergence ? `${cmp.firstDivergence.channel.label}: ${cmp.firstDivergence.channel.summary}` : null,
+          channels: cmp.channels.map((c) => ({ channel: c.label, signal: c.signal, status: c.status, summary: c.summary })),
+        }
+      : null,
+    finalValues:
+      finals && finals.rows.length
+        ? {
+            passed: finals.passed,
+            failed: finals.failed,
+            rows: finals.rows.map((r) => ({ register: r.key, model: r.expected, hardware: r.actual, status: r.status })),
+          }
+        : null,
+  };
+}
+
+const esc = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+
+export function reportToMarkdown(d: ReportData): string {
+  const L: string[] = [];
+  L.push(`# Validation report: ${esc(d.program)}`, "");
+  L.push(`- Processor: ${d.processor}, ${d.pipeline.stages}-stage pipeline, ${d.pipeline.forwarding}`);
+  if (d.pipeline.estimatedCycles !== null) {
+    L.push(`- Timing estimate: ${d.pipeline.estimatedCycles} cycles (CPI ${d.pipeline.cpi})${d.pipeline.hardwareCycles !== null ? `; hardware finished at cycle ${d.pipeline.hardwareCycles}` : ""}`);
+  }
+  if (d.pipeline.timingVerdict) L.push(`- Timing: ${d.pipeline.timingVerdict}`);
+  L.push(`- Generated by ${BRAND}: ${d.generatedAt}`);
+  L.push(
+    `- Model options: IADD ${d.options.iaddSignExtend ? "sign-extends" : "uses the word as-is"}; SUB carry = ${d.options.subCarry === "notBorrow" ? "not borrow" : "borrow"}; IN ${d.options.inUpdatesFlags ? "updates" : "keeps"} flags; external interrupt ${d.options.extIntPushesFlags ? "pushes" : "does not push"} flags`,
+    "",
+  );
+  L.push("## Assembly", "", `${d.assembly.words} words · ${d.assembly.errors} errors · ${d.assembly.warnings} warnings`, "");
+  if (d.assembly.diagnostics.length) {
+    L.push("| Line | Severity | Message |", "| ---: | --- | --- |");
+    for (const x of d.assembly.diagnostics) L.push(`| ${x.line} | ${x.severity} | ${esc(x.message)} |`);
+    L.push("");
+  }
+  L.push("## Reference model", "");
+  if (d.simulation) {
+    L.push(`${d.simulation.steps} steps, stopped by: ${d.simulation.halt}`, "");
+    L.push("| Register | Final value |", "| --- | --- |");
+    d.simulation.finalRegisters.forEach((v, i) => L.push(`| R${i} | ${v} |`));
+    L.push(`| SP | ${d.simulation.sp} |`, `| Flags | ${d.simulation.flags} |`, `| OUT | ${d.simulation.out ?? "—"} |`, "");
+    for (const w of d.simulation.warnings) L.push(`> ${esc(w)}`);
+    if (d.simulation.warnings.length) L.push("");
+  } else L.push("Not run (fix assembly errors first).", "");
+  L.push("## Checks", "", `${d.checks.passed} passed · ${d.checks.failed} failed · ${d.checks.notRun} not run`, "");
+  if (d.checks.items.length) {
+    L.push("| Line | Check | Result | Model value |", "| ---: | --- | --- | --- |");
+    for (const x of d.checks.items) {
+      L.push(`| ${x.line || "end"} | ${esc(x.check)} | ${x.status}${x.note ? ` (${esc(x.note)})` : ""} | ${esc(x.actual)} |`);
+    }
+    L.push("");
+  }
+  L.push("## Hardware comparison", "");
+  if (d.hardware) {
+    L.push(`${d.hardware.passed} channels match · ${d.hardware.failed} differ`, "");
+    if (d.hardware.firstDivergence) L.push(`**First divergence:** ${esc(d.hardware.firstDivergence)}`, "");
+    L.push("| Channel | Signal | Status | Detail |", "| --- | --- | --- | --- |");
+    for (const c of d.hardware.channels) L.push(`| ${c.channel} | ${c.signal ?? "—"} | ${c.status} | ${esc(c.summary)} |`);
+    L.push("");
+  } else L.push("No waveform compared yet.", "");
+  L.push("## Final values from hardware", "");
+  if (d.finalValues) {
+    L.push(`${d.finalValues.passed} match · ${d.finalValues.failed} differ`, "");
+    L.push("| Register | Model | Hardware | Status |", "| --- | --- | --- | --- |");
+    for (const r of d.finalValues.rows) L.push(`| ${r.register} | ${r.model} | ${r.hardware} | ${r.status} |`);
+    L.push("");
+  } else L.push("None entered.", "");
+  return L.join("\n");
+}
