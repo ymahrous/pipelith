@@ -152,6 +152,8 @@ npm start            # http://localhost:3000
 
 Deploy anywhere that runs a Next.js server (Vercel, a container, a VM). Keep `src/proxy.ts` — it sets the Content-Security-Policy.
 
+Both are optional; copy [`.env.example`](.env.example) to `.env` to set them locally.
+
 | Environment variable | Default | Effect |
 | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | `https://$VERCEL_PROJECT_PRODUCTION_URL`, else `http://localhost:3000` | Canonical URL for metadata, sitemap, robots, JSON-LD and Open Graph |
