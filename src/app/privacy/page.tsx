@@ -3,12 +3,13 @@ import Link from "next/link";
 import { AnalyticsOptOut } from "@/components/AnalyticsOptOut";
 import { SITE } from "@/lib/site";
 import { ANALYTICS_OPT_OUT_KEY } from "@/lib/util/privacy";
+import { DISPLAY_KEY } from "@/lib/util/display";
 import { STORAGE_KEY } from "@/lib/session/session";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
   description:
-    "How Pipelith handles data: your code, programs and waveforms are processed only in your browser; no accounts or cookies; optional cookieless Vercel analytics with opt-out.",
+    "How Pipelith handles data: your code, programs and waveforms are processed only in your browser; no accounts or cookies; optional cookieless Vercel analytics with opt-out; your rights under GDPR, UK GDPR, CCPA/CPRA, LGPD, PIPEDA and other laws.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -18,12 +19,15 @@ const TOC = [
   ["local", "What stays in your browser"],
   ["storage", "Browser storage"],
   ["share", "Share links"],
+  ["ai", "AI assistant prompts"],
   ["analytics", "Analytics and performance measurement"],
   ["hosting", "Hosting and server logs"],
-  ["cookies", "Cookies"],
+  ["cookies", "Cookies and similar technologies"],
   ["basis", "Legal bases"],
   ["retention", "How long data is kept"],
+  ["transfers", "International transfers"],
   ["rights", "Your rights"],
+  ["regional", "Rights in specific regions"],
   ["children", "Children"],
   ["security", "Security"],
   ["changes", "Changes to this policy"],
@@ -43,9 +47,9 @@ export default function PrivacyPage() {
             <h2>Summary</h2>
             <ul>
               <li>
-                <strong>Your files never leave your device.</strong> VHDL code, assembly programs, memory images, waveforms,
-                register values and reports are opened and processed by JavaScript running in your browser. They are not sent
-                to us or to anyone else.
+                <strong>Your files never leave your device.</strong> VHDL, Verilog and SystemVerilog code, assembly programs,
+                memory images, waveforms, register values and reports are opened and processed by JavaScript running in your
+                browser. They are not sent to us or to anyone else.
               </li>
               <li>
                 <strong>No accounts, no cookies, no advertising, no selling of data.</strong>
@@ -71,7 +75,8 @@ export default function PrivacyPage() {
             <p>Everything you give the app is handled locally:</p>
             <ul>
               <li>Programs you type or open (.asm, .mem) and their assembly, simulation and checks.</li>
-              <li>Codebases you upload for Code review (.zip, folders, .vhd files) and the review results.</li>
+              <li>Codebases you upload for Code review (.zip, folders, .vhd, .v and .sv files) and the review results.</li>
+              <li>Expected waveforms and AI restructuring prompts — both are generated in your browser.</li>
               <li>Waveforms (.vcd, .vcd.gz) and final register values you upload or type for comparison.</li>
               <li>Hardware kits, reports and exports you download — they are generated in your browser.</li>
               <li>
@@ -89,18 +94,24 @@ export default function PrivacyPage() {
 
           <section id="storage" className="stack stack--tight">
             <h2>Browser storage</h2>
-            <p>The app saves two things in your browser&apos;s local storage so your work survives a reload:</p>
+            <p>The app saves up to three things in your browser&apos;s local storage so your work survives a reload:</p>
             <ul>
               <li>
                 <code>{STORAGE_KEY}</code> — your current program, IN-port values, interrupts, model and pipeline settings,
-                checks, typed final values and the compile order. It is not sent anywhere. Uploaded codebases and
-                waveforms are <em>not</em> stored; they are dropped when you leave the page.
+                design language, checks, typed final values and the compile order. It is not sent anywhere. Uploaded codebases
+                and waveforms are <em>not</em> stored; they are dropped when you leave the page.
+              </li>
+              <li>
+                <code>{DISPLAY_KEY}</code> — present only if you change Display settings (colours, text size, typeface, motion).
               </li>
               <li>
                 <code>{ANALYTICS_OPT_OUT_KEY}</code> — present only if you opt out of measurements below.
               </li>
             </ul>
-            <p>You can delete both at any time by clearing this site&apos;s data in your browser settings.</p>
+            <p>
+              These entries exist only to provide what you ask for, never leave your device and identify no one. You can delete
+              them at any time by clearing this site&apos;s data in your browser settings.
+            </p>
           </section>
 
           <section id="share" className="stack stack--tight">
@@ -109,6 +120,16 @@ export default function PrivacyPage() {
               <em>Copy share link</em> puts your program and settings into the link itself, after the <code>#</code>. Browsers
               never send that part of a URL to a server, and our measurements remove it before anything is reported. Anyone
               you give the link to can read the program, so share it only with people you trust.
+            </p>
+          </section>
+
+          <section id="ai" className="stack stack--tight">
+            <h2>AI assistant prompts</h2>
+            <p>
+              When an upload isn&apos;t structured the way Code review needs, Pipelith can write a prompt for an AI assistant.
+              It is built in your browser and contains your file names, the language and pipeline depth you chose and the
+              problems found — none of your code. Pipelith never sends it anywhere: you copy or download it yourself. If you
+              paste it into an AI service, that service&apos;s own terms and privacy policy apply to what you send.
             </p>
           </section>
 
@@ -158,10 +179,12 @@ export default function PrivacyPage() {
           </section>
 
           <section id="cookies" className="stack stack--tight">
-            <h2>Cookies</h2>
+            <h2>Cookies and similar technologies</h2>
             <p>
-              Pipelith sets no cookies, and neither do the measurements described above. Because no cookies or
-              tracking identifiers are stored for analytics, no cookie banner is shown.
+              Pipelith sets no cookies, and neither do the measurements described above. The local-storage entries listed
+              under <a href="#storage">Browser storage</a> are strictly necessary for features you use (keeping your work and
+              your display choices) and are not used for tracking or advertising, so under the EU ePrivacy rules and similar
+              laws no consent banner is needed.
             </p>
           </section>
 
@@ -194,6 +217,16 @@ export default function PrivacyPage() {
             </ul>
           </section>
 
+          <section id="transfers" className="stack stack--tight">
+            <h2>International transfers</h2>
+            <p>
+              Your files and work stay on your device, so they are never transferred. Hosting logs and, on Vercel, the anonymous
+              measurements are handled by the hosting provider, which may process them outside your country — Vercel is based in
+              the United States. Vercel&apos;s privacy policy and data processing addendum describe the safeguards it uses for
+              international transfers.
+            </p>
+          </section>
+
           <section id="rights" className="stack stack--tight">
             <h2>Your rights</h2>
             <p>
@@ -203,6 +236,29 @@ export default function PrivacyPage() {
               you, so there is usually nothing to look up — but you can still contact us and we will help, including with
               requests to Vercel.
             </p>
+          </section>
+
+          <section id="regional" className="stack stack--tight">
+            <h2>Rights in specific regions</h2>
+            <ul>
+              <li>
+                <strong>European Union, EEA and United Kingdom (GDPR, UK GDPR):</strong> access, rectification, erasure,
+                restriction, portability and objection, and the right to lodge a complaint with your supervisory authority. We
+                make no decisions about you by automated means.
+              </li>
+              <li>
+                <strong>California (CCPA/CPRA) and other US states with privacy laws:</strong> we do not sell or share personal
+                information, use it for targeted advertising or profile anyone; Global Privacy Control is honoured
+                automatically. You may ask what we hold (in practice, nothing linked to you) and will not be treated differently
+                for using your rights.
+              </li>
+              <li>
+                <strong>Brazil (LGPD), Canada (PIPEDA), Switzerland (FADP), South Africa (POPIA), Japan (APPI), South Korea
+                (PIPA), India (DPDP Act), Australia (Privacy Act) and elsewhere:</strong> you have comparable rights to know,
+                correct and delete data about you and to complain to your regulator. Contact us as described below and we will
+                answer under the law that applies to you.
+              </li>
+            </ul>
           </section>
 
           <section id="children" className="stack stack--tight">

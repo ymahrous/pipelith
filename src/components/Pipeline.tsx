@@ -6,6 +6,7 @@ import { useWorkbench } from "./SessionProvider";
 import { STEPS, type StepSlug } from "./steps";
 import { goalInfo } from "./goals";
 import { describeForwarding, geometry } from "@/lib/pipeline/pipeline";
+import { HDL_INFO } from "@/lib/hdl";
 
 type Tone = "idle" | "ok" | "warn" | "fail";
 
@@ -58,7 +59,7 @@ export function Pipeline() {
           <span className="pipeline__program">{ready ? session.name : " "}</span>
           <span>
             {analysis.profile.name}, {session.stages}-stage pipeline,{" "}
-            {describeForwarding(geometry(session.stages), session.forwarding).split(" (")[0]}
+            {describeForwarding(geometry(session.stages), session.forwarding).split(" (")[0]}, {HDL_INFO[session.hdl].label}
           </span>
           <span>{goalInfo(session.goal).title}</span>
         </div>

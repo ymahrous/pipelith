@@ -5,7 +5,7 @@ import { QUICK_ACCEPT } from "@/lib/util/routeFiles";
 import { useQuickStart } from "./useQuickStart";
 
 const ROUTES: [string, string][] = [
-  [".zip, .vhd", "Code review"],
+  [".zip, .vhd, .v, .sv", "Code review"],
   [".asm, .mem", "Assemble"],
   [".vcd + .asm", "Compare"],
   [".txt values", "Compare"],

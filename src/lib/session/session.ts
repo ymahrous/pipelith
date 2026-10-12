@@ -12,6 +12,7 @@ import { FULL_FORWARDING, type Depth, type ForwardingConfig } from "../pipeline/
 import { DEFAULT_MAX_STEPS, HARD_MAX_STEPS } from "../sim/simulator";
 import { MAX_SOURCE_BYTES } from "../asm/assembler";
 import { MAX_MEM_BYTES } from "../asm/memfile";
+import { DEFAULT_HDL, toHdl, type Hdl } from "../hdl";
 
 export interface Session {
   v: 1;
@@ -34,6 +35,8 @@ export interface Session {
   stages: Depth;
   /** Which results the design forwards; drives timing, the verdict and the review's forwarding checks. */
   forwarding: ForwardingConfig;
+  /** Language the design is written in: picks the testbench, scripts, sample codebase and docs examples. */
+  hdl: Hdl;
   /** VHDL compile order found by Code review; the hardware kit uses it instead of the profile's list. */
   compileOrder: string[] | null;
   /** Final register values reported by the hardware, as typed or uploaded (R1=5, SP=FFE …). */
@@ -64,6 +67,7 @@ export function emptySession(): Session {
     goal: "hardware",
     stages: 6,
     forwarding: { ...FULL_FORWARDING },
+    hdl: DEFAULT_HDL,
     finalValues: "",
     compileOrder: null,
   };
@@ -152,6 +156,7 @@ export function parseSession(raw: unknown): Session | null {
       : "all";
     s.forwarding = { enabled: f.enabled !== false, paths, writeThrough: f.writeThrough !== false };
   }
+  s.hdl = toHdl(raw.hdl) ?? DEFAULT_HDL;
   if (Array.isArray(raw.compileOrder)) {
     const files = raw.compileOrder
       .slice(0, 2000)
@@ -165,7 +170,8 @@ export function parseSession(raw: unknown): Session | null {
 
 /**
  * A new program in an existing session. Everything about the program resets;
- * settings that describe the design under test (and the model options) stay.
+ * settings that describe the design under test (depth, forwarding, language,
+ * compile order, RTL folder) and the model options stay.
  */
 export function withProgram(
   s: Session,
@@ -179,12 +185,23 @@ export function withProgram(
     goal: p.goal ?? s.goal,
     stages: s.stages,
     forwarding: s.forwarding,
+    hdl: s.hdl,
     compileOrder: s.compileOrder,
     rtlRoot: s.rtlRoot,
     name: p.name,
     source: p.source,
     sourceKind: p.sourceKind ?? "asm",
   };
+}
+
+/**
+ * Change the design language. A compile order from a review in another
+ * language would make the kit compile the wrong files, so it is dropped.
+ */
+export function withHdl(s: Session, hdl: Hdl): Session {
+  if (s.hdl === hdl) return s;
+  const fits = (f: string) => (hdl === "vhdl" ? /\.(vhd|vhdl|vho)$/i.test(f) : /\.(v|sv)$/i.test(f));
+  return { ...s, hdl, compileOrder: s.compileOrder && s.compileOrder.every(fits) ? s.compileOrder : null };
 }
 
 export function loadStoredSession(): Session | null {

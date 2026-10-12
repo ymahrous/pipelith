@@ -119,6 +119,28 @@ export const risc6: ProcessorProfile = {
       "stages/6-writeback/src/writeback_stage.vhd",
       "processor.vhd",
     ],
+    // The 5-stage Verilog design bundled with Pipelith (reference/verilog).
+    verilog: {
+      interruptPort: "intr",
+      compileOrder: [
+        "components/memory.v",
+        "components/register_file.v",
+        "components/alu.v",
+        "components/control_unit.v",
+        "components/forwarding_unit.v",
+        "components/hazard_unit.v",
+        "pipeline_registers/if_id_register.v",
+        "pipeline_registers/id_ex_register.v",
+        "pipeline_registers/ex_mem_register.v",
+        "pipeline_registers/mem_wb_register.v",
+        "stages/fetch_stage.v",
+        "stages/decode_stage.v",
+        "stages/execute_stage.v",
+        "stages/memory_stage.v",
+        "stages/writeback_stage.v",
+        "processor.v",
+      ],
+    },
   },
 };
 

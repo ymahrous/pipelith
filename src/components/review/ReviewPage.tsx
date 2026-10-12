@@ -2,17 +2,21 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { HDL_INFO, HDLS, type Hdl } from "@/lib/hdl";
 import { geometry } from "@/lib/pipeline/pipeline";
+import { restructurePrompt } from "@/lib/review/aiPrompt";
 import { readFileList, readZip, REVIEW_LIMITS, stripCommonRoot, type IntakeResult, type SourceFile } from "@/lib/review/intake";
 import { reviewToMarkdown } from "@/lib/review/report";
-import { reviewCodebase, type Category, type Finding, type HierarchyNode, type Severity } from "@/lib/review/review";
-import { withProgram } from "@/lib/session/session";
+import { reviewCodebase, type Category, type Finding, type HierarchyNode, type ReviewReport, type Severity } from "@/lib/review/review";
+import { checkStructure } from "@/lib/review/structure";
+import { withHdl, withProgram } from "@/lib/session/session";
 import { downloadBlob, slug } from "@/lib/util/download";
 import { PipelineSettings } from "../DepthPicker";
 import { FileDrop } from "../FileDrop";
 import { useWorkbench } from "../SessionProvider";
 import { Badge } from "../ui";
+import { AiPromptPanel } from "./AiPromptPanel";
 import { ZipGuide } from "./ZipGuide";
 
 interface Loaded {
@@ -22,6 +26,33 @@ interface Loaded {
   files: SourceFile[];
   programs: SourceFile[];
   skipped: IntakeResult["skipped"];
+  ignored: string[];
+}
+
+/** An upload that produced nothing to review, kept so the AI prompt can list its files. */
+interface Rejected {
+  name: string;
+  message: string;
+  paths: string[];
+}
+
+/** The reference processor bundled for each language. */
+const SAMPLES: Record<Hdl, { url: string; name: string }> = {
+  vhdl: { url: "/samples/reference-rtl.zip", name: "Reference processor (risc-pipelined-processor)" },
+  verilog: { url: "/samples/reference-rtl-verilog.zip", name: "Reference processor (5-stage Verilog)" },
+  systemverilog: { url: "/samples/reference-rtl-systemverilog.zip", name: "Reference processor (5-stage SystemVerilog)" },
+};
+
+const ACCEPT = [...HDLS.flatMap((h) => [...HDL_INFO[h].extensions, ...HDL_INFO[h].headers]), ".asm", ".s"].join(",");
+
+/** "1 module", "3 modules"; empty for zero. */
+const count = (n: number, one: string, many: string) => (n ? `${n.toLocaleString()} ${n === 1 ? one : many}` : "");
+
+/** "28 VHDL files", "12 Verilog and 2 SystemVerilog files" */
+function filesByLanguage(r: ReviewReport) {
+  const parts = HDLS.filter((h) => r.languages[h]).map((h) => `${r.languages[h]} ${HDL_INFO[h].label}`);
+  const total = HDLS.reduce((n, h) => n + r.languages[h], 0);
+  return `${parts.join(" and ") || "0"} file${total === 1 ? "" : "s"}`;
 }
 
 const SEV_LABEL: Record<Severity, string> = { error: "Error", warning: "Warning", info: "Note" };
@@ -84,41 +115,90 @@ function Tree({ node }: { node: HierarchyNode }) {
   );
 }
 
-function StructureCheck({ loaded, report }: { loaded: Loaded; report: NonNullable<ReturnType<typeof reviewCodebase>> }) {
+function StructureCheck({ loaded, report }: { loaded: Loaded; report: ReviewReport }) {
+  const { session, update } = useWorkbench();
   const folders = new Set(loaded.files.map((f) => f.path.split("/").slice(0, -1).join("/") || "."));
-  const missingPkgs = report.findings.filter((f) => f.rule === "missing-package").length;
-  const unknownUnits = report.findings.filter((f) => f.rule === "unknown-unit").length;
-  const dupes = report.findings.filter((f) => f.rule === "duplicate-entity").length;
-  const verilog = loaded.skipped.filter((s) => /Verilog/.test(s.reason)).length;
-  const problems = [
-    missingPkgs && `${missingPkgs} package${missingPkgs > 1 ? "s are" : " is"} missing`,
-    unknownUnits && `${unknownUnits} instance${unknownUnits > 1 ? "s use" : " uses"} a unit that isn't in the upload`,
-    dupes && `${dupes} entit${dupes > 1 ? "ies are" : "y is"} defined twice`,
-    !report.top && "no top-level entity was found",
-  ].filter(Boolean) as string[];
+  const check = checkStructure({ files: loaded.files.map((f) => f.path), report, hdl: session.hdl });
+  const prefix = loaded.root ? loaded.root + "/" : "";
+  const paths = [...loaded.files.map((f) => prefix + f.path), ...loaded.programs.map((f) => prefix + f.path), ...loaded.skipped.map((x) => x.path), ...loaded.ignored];
   return (
-    <div className={`notice ${problems.length ? "notice--probe" : ""}`} role="status">
-      <span aria-hidden="true">{problems.length ? "!" : "✓"}</span>
-      <div className="stack stack--tight">
-        <strong>{problems.length ? "Check the upload's structure" : "The upload looks complete"}</strong>
-        <span className="small">
-          {loaded.files.length} VHDL files in {folders.size} folder{folders.size > 1 ? "s" : ""}
-          {loaded.root ? (
-            <>
-              {" "}
-              under <code>{loaded.root}/</code> (removed from paths)
-            </>
-          ) : null}
-          ; top level <code>{report.top ?? "not found"}</code>; {report.testbenches.length} testbench
-          {report.testbenches.length === 1 ? "" : "es"}; {loaded.programs.length} .asm program{loaded.programs.length === 1 ? "" : "s"}
-          {verilog ? `; ${verilog} Verilog file${verilog > 1 ? "s" : ""} skipped` : ""}.
-        </span>
-        {problems.length > 0 && (
+    <>
+      {check.otherLanguage && (
+        <div className="notice notice--probe" role="status">
+          <span aria-hidden="true">!</span>
+          <div>
+            <strong>
+              These files are {HDL_INFO[check.otherLanguage].label}, but {HDL_INFO[session.hdl].label} is selected
+            </strong>
+            The review reads them anyway; the language setting decides the hardware kit, samples and examples.{" "}
+            <button className="linkbtn" onClick={() => update((s) => withHdl(s, check.otherLanguage!))}>
+              Use {HDL_INFO[check.otherLanguage].label}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className={`notice ${check.ok ? "" : "notice--probe"}`} role="status">
+        <span aria-hidden="true">{check.ok ? "✓" : "!"}</span>
+        <div className="stack stack--tight">
+          <strong>{check.ok ? "The upload looks complete" : "Check the upload's structure"}</strong>
           <span className="small">
-            {problems.join("; ")}. Add the missing files to the .zip — see “How to structure your .zip” above — and upload again.
+            {filesByLanguage(report)} in {folders.size} folder{folders.size > 1 ? "s" : ""}
+            {loaded.root ? (
+              <>
+                {" "}
+                under <code>{loaded.root}/</code> (removed from paths)
+              </>
+            ) : null}
+            ; top level <code>{report.top ?? "not found"}</code>; {report.testbenches.length} testbench
+            {report.testbenches.length === 1 ? "" : "es"}; {loaded.programs.length} .asm program{loaded.programs.length === 1 ? "" : "s"}.
           </span>
-        )}
+          {!check.ok && (
+            <span className="small">
+              {check.problems.map((p) => p[0].toUpperCase() + p.slice(1)).join("; ")}. Add the missing files to the .zip — see
+              “How to structure your .zip” above — and upload again, or let an AI assistant sort the files out for you:
+            </span>
+          )}
+        </div>
       </div>
+      {!check.ok && (
+        <AiPromptPanel
+          prompt={restructurePrompt({ hdl: check.otherLanguage ?? session.hdl, depth: session.stages, paths, problems: check.problems, uploadName: loaded.name })}
+        />
+      )}
+    </>
+  );
+}
+
+/** Tabs with the WAI-ARIA keyboard pattern: arrows move between tabs, Home/End jump to the ends. */
+function Tabs<T extends string>({ label, tabs, value, onChange }: { label: string; tabs: [T, string][]; value: T; onChange: (v: T) => void }) {
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const onKey = (e: KeyboardEvent, i: number) => {
+    const n = tabs.length;
+    const to = e.key === "ArrowRight" ? (i + 1) % n : e.key === "ArrowLeft" ? (i - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    onChange(tabs[to][0]);
+    refs.current[to]?.focus();
+  };
+  return (
+    <div className="tabs" role="tablist" aria-label={label}>
+      {tabs.map(([id, text], i) => (
+        <button
+          key={id}
+          ref={(el) => {
+            refs.current[i] = el;
+          }}
+          role="tab"
+          id={`tab-${id}`}
+          aria-controls={`panel-${id}`}
+          aria-selected={value === id}
+          tabIndex={value === id ? 0 : -1}
+          onClick={() => onChange(id)}
+          onKeyDown={(e) => onKey(e, i)}
+        >
+          {text}
+        </button>
+      ))}
     </div>
   );
 }
@@ -129,6 +209,7 @@ export function ReviewPage() {
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rejected, setRejected] = useState<Rejected | null>(null);
   const [sev, setSev] = useState<Severity | "all">("all");
   const [cat, setCat] = useState<Category | "all">("all");
   const [file, setFile] = useState("all");
@@ -149,19 +230,20 @@ export function ReviewPage() {
   const take = async (name: string, read: () => Promise<IntakeResult>) => {
     setBusy(true);
     setError(null);
+    setRejected(null);
     try {
       const r = await read();
       if (!r.files.length) {
-        setError(
-          r.skipped.length
-            ? `No VHDL files found. Skipped: ${r.skipped.slice(0, 3).map((s) => `${s.path} (${s.reason})`).join("; ")}.`
-            : "No .vhd or .vhdl files found. Upload the folder (or a .zip of it) that contains your VHDL sources.",
-        );
+        const message = r.skipped.length
+          ? `No HDL source files found. Skipped: ${r.skipped.slice(0, 3).map((s) => `${s.path} (${s.reason})`).join("; ")}.`
+          : "No .vhd, .vhdl, .v or .sv files found. Upload the folder (or a .zip of it) that contains your design's source files.";
+        setError(message);
+        setRejected({ name, message, paths: [...r.programs.map((p) => p.path), ...r.skipped.map((x) => x.path), ...r.ignored] });
         setLoaded(null);
       } else {
         const stripped = stripCommonRoot(r.files);
         const root = r.files.length > 1 ? r.files[0].path.slice(0, r.files[0].path.length - stripped[0].path.length).replace(/\/$/, "") : "";
-        setLoaded({ name, root, files: stripped, programs: stripCommonRoot(r.programs), skipped: r.skipped });
+        setLoaded({ name, root, files: stripped, programs: stripCommonRoot(r.programs), skipped: r.skipped, ignored: r.ignored });
         setTab("findings");
         setSev("all");
         setCat("all");
@@ -187,11 +269,12 @@ export function ReviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on arrival
   }, []);
   const sample = () =>
-    take("Reference processor (risc-pipelined-processor)", async () => {
-      const res = await fetch("/samples/reference-rtl.zip");
+    take(SAMPLES[session.hdl].name, async () => {
+      const res = await fetch(SAMPLES[session.hdl].url);
       if (!res.ok) throw new Error("Could not load the sample.");
       return readZip(await res.blob());
     });
+  const info = HDL_INFO[session.hdl];
 
   const shown = useMemo(
     () =>
@@ -215,8 +298,9 @@ export function ReviewPage() {
       <header className="step-head">
         <h1>Review your processor code</h1>
         <p>
-          Upload your VHDL and get a review: syntax and structure errors, broken connections, sensitivity-list and latch
-          problems, and pipeline checks for your chosen depth. Each finding says where it is and how to fix it.
+          Upload your VHDL, Verilog or SystemVerilog and get a review: syntax and structure errors, broken connections,
+          sensitivity-list, latch and blocking-assignment problems, and pipeline checks for your chosen depth. Each finding says
+          where it is and how to fix it.
         </p>
       </header>
 
@@ -226,8 +310,15 @@ export function ReviewPage() {
             <strong>What to upload</strong>
             <ul>
               <li>
-                All the VHDL files of your design (<code>.vhd</code>, <code>.vhdl</code>), including packages and every
-                component — the review checks how files connect to each other.
+                All the {info.label} files of your design (
+                {[...info.extensions, ...info.headers].map((x, i) => (
+                  <span key={x}>
+                    {i ? ", " : ""}
+                    <code>{x}</code>
+                  </span>
+                ))}
+                ), including {session.hdl === "vhdl" ? "packages and every component" : session.hdl === "verilog" ? "every `included header and every module" : "every package, `included header, interface and module"} —
+                the review checks how files connect to each other. Mixed VHDL and Verilog designs work too.
               </li>
               <li>As a .zip, a folder, or the files themselves. Other files are ignored; .asm test programs are listed so you can open them.</li>
               <li>
@@ -243,7 +334,7 @@ export function ReviewPage() {
           <FileDrop
             accept=".zip,application/zip"
             label="Upload a .zip"
-            hint="Or drop a .zip or several .vhd files here."
+            hint="Or drop a .zip or several source files here."
             onFile={(f) => (/\.zip$/i.test(f.name) ? take(f.name, () => readZip(f)) : fromFiles([f], f.name))}
           />
           <div className="btn-row">
@@ -265,7 +356,7 @@ export function ReviewPage() {
               ref={filesInput}
               type="file"
               multiple
-              accept=".vhd,.vhdl,.asm"
+              accept={ACCEPT}
               className="visually-hidden"
               aria-label="Choose files"
               onChange={(e) => {
@@ -274,7 +365,7 @@ export function ReviewPage() {
               }}
             />
             <button className="btn" onClick={() => filesInput.current?.click()} disabled={busy}>
-              Choose .vhd files
+              Choose {info.label} files
             </button>
             <button className="btn btn--ghost" onClick={sample} disabled={busy}>
               Try the reference processor
@@ -290,9 +381,18 @@ export function ReviewPage() {
               </div>
             </div>
           )}
+          {rejected && rejected.paths.length > 0 && (
+            <AiPromptPanel
+              open
+              prompt={restructurePrompt({ hdl: session.hdl, depth: session.stages, paths: rejected.paths, problems: [rejected.message.replace(/\.$/, "")], uploadName: rejected.name })}
+            />
+          )}
         </section>
         <aside className="panel stack stack--tight" aria-label="Review settings">
           <PipelineSettings />
+          <p className="small">
+            Language: <strong>{info.label}</strong> <span className="muted xsmall">— change it at the top of the page.</span>
+          </p>
           <p className="muted xsmall">
             Pipeline checks look for the {geo.registers.length} pipeline registers of a {session.stages}-stage design (
             {geo.registers.join(", ")}). With forwarding allowed they expect a forwarding unit fed from the selected paths; with
@@ -330,19 +430,28 @@ export function ReviewPage() {
           <div className="review-summary">
             <div>
               <span className="review-summary__n">{report.counts.error}</span>
-              <span>errors</span>
+              <span>{report.counts.error === 1 ? "error" : "errors"}</span>
             </div>
             <div>
               <span className="review-summary__n">{report.counts.warning}</span>
-              <span>warnings</span>
+              <span>{report.counts.warning === 1 ? "warning" : "warnings"}</span>
             </div>
             <div>
               <span className="review-summary__n">{report.counts.info}</span>
-              <span>notes</span>
+              <span>{report.counts.info === 1 ? "note" : "notes"}</span>
             </div>
             <p className="small muted">
-              {report.files} files · {report.lines.toLocaleString()} lines · {report.entities} entities · {report.processes} processes ·{" "}
-              {report.instances} instances · top level <code>{report.top ?? "?"}</code>
+              {count(report.files, "file", "files")} · {count(report.lines, "line", "lines")} ·{" "}
+              {[
+                count(report.entities, "entity", "entities"),
+                count(report.processes, "process", "processes"),
+                count(report.modules, "module", "modules"),
+                count(report.alwaysBlocks, "always block", "always blocks"),
+                count(report.instances, "instance", "instances") || "0 instances",
+              ]
+                .filter(Boolean)
+                .join(" · ")}{" "}
+              · top level <code>{report.top ?? "?"}</code>
             </p>
           </div>
           <StructureCheck loaded={loaded} report={report} />
@@ -374,17 +483,18 @@ export function ReviewPage() {
             </p>
           )}
 
-          <div className="tabs" role="tablist" aria-label="Review views">
-            <button role="tab" aria-selected={tab === "findings"} onClick={() => setTab("findings")}>
-              Findings ({report.findings.length})
-            </button>
-            <button role="tab" aria-selected={tab === "overview"} onClick={() => setTab("overview")}>
-              Design overview
-            </button>
-          </div>
+          <Tabs
+            label="Review views"
+            value={tab}
+            onChange={setTab}
+            tabs={[
+              ["findings", `Findings (${report.findings.length})`],
+              ["overview", "Design overview"],
+            ]}
+          />
 
           {tab === "findings" && (
-            <div className="stack">
+            <div className="stack" role="tabpanel" id="panel-findings" aria-labelledby="tab-findings" tabIndex={0}>
               <div className="btn-row review-filters">
                 <fieldset className="option-tabs">
                   <legend className="visually-hidden">Severity</legend>
@@ -431,7 +541,7 @@ export function ReviewPage() {
           )}
 
           {tab === "overview" && (
-            <div className="split split--wide-side">
+            <div className="split split--wide-side" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" tabIndex={0}>
               <div className="stack">
                 <section className="stack stack--tight">
                   <h3>Hierarchy</h3>
@@ -440,7 +550,7 @@ export function ReviewPage() {
                       <Tree node={report.hierarchy} />
                     </ul>
                   ) : (
-                    <p className="muted small">No top-level entity found.</p>
+                    <p className="muted small">No top-level entity or module found.</p>
                   )}
                   {report.testbenches.length > 0 && <p className="xsmall muted">Testbenches: {report.testbenches.join(", ")}</p>}
                 </section>

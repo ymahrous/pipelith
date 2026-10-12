@@ -45,13 +45,18 @@ SOFTWARE.`}</pre>
         <h2>Third-party material</h2>
         <ul>
           <li>
-            Bundled test programs and sample waveforms come from the{" "}
+            The bundled test programs, the 6-stage VHDL reference RTL and its GHDL waveforms come from the{" "}
             <a href="https://github.com/ymahrous/risc-pipelined-processor" rel="noopener noreferrer">
               risc-pipelined-processor
             </a>{" "}
-            project (MIT).
+            project (MIT). The 5-stage Verilog and SystemVerilog reference designs and their waveforms are part of Pipelith
+            (MIT).
           </li>
-          <li>Fonts: Archivo and JetBrains Mono (SIL Open Font License 1.1), served from this site.</li>
+          <li>
+            Fonts, served from this site under the SIL Open Font License 1.1: Recursive (© 2019 The Recursive Project
+            Authors), Atkinson Hyperlegible Next and Atkinson Hyperlegible Mono (© 2020–2024 The Atkinson Hyperlegible Next and
+            Mono Project Authors).
+          </li>
           <li>Next.js and React (MIT).</li>
         </ul>
         <p>

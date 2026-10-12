@@ -12,19 +12,20 @@ export type Destination =
   | { kind: "program+values"; program: number; values: number }
   | { kind: "unknown"; reason: string };
 
-const VHDL = /\.(vhd|vhdl|vho)$/i;
+/** Any HDL source or header: VHDL, Verilog or SystemVerilog. */
+const HDL = /\.(vhd|vhdl|vho|v|vh|sv|svh)$/i;
 const ZIP = /\.zip$/i;
 const PROGRAM = /\.(asm|s|mem)$/i;
 const WAVE = /\.vcd(\.gz)?$/i;
 const VALUES = /\.txt$/i;
 
-export const QUICK_ACCEPT = ".zip,.vhd,.vhdl,.asm,.s,.mem,.vcd,.gz,.txt";
+export const QUICK_ACCEPT = ".zip,.vhd,.vhdl,.v,.vh,.sv,.svh,.asm,.s,.mem,.vcd,.gz,.txt";
 
 /** Route by file name only; contents are validated later by the page that opens them. */
 export function routeFiles(names: readonly string[]): Destination {
   if (!names.length) return { kind: "unknown", reason: "No files were dropped." };
   const idx = (re: RegExp) => names.flatMap((n, i) => (re.test(n) ? [i] : []));
-  const code = [...idx(ZIP), ...idx(VHDL)];
+  const code = [...idx(ZIP), ...idx(HDL)];
   if (code.length) {
     // A codebase: every file goes to Code review (it also lists .asm programs).
     return { kind: "review", files: names.map((_, i) => i) };
@@ -44,6 +45,7 @@ export function routeFiles(names: readonly string[]): Destination {
   if (v !== undefined) return { kind: "values", values: v };
   return {
     kind: "unknown",
-    reason: "Pipelith opens .zip, .vhd and .vhdl (code review), .asm and .mem (programs), .vcd and .vcd.gz (waveforms) and .txt (final register values).",
+    reason:
+      "Pipelith opens .zip, .vhd, .v and .sv (code review), .asm and .mem (programs), .vcd and .vcd.gz (waveforms) and .txt (final register values).",
   };
 }

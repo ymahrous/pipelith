@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { RULES } from "../src/lib/review/rules";
 
 /** Fail the test on any console error, including CSP violations. */
 function watchConsole(page: Page) {
@@ -90,7 +91,7 @@ test("a hostile share link is ignored", async ({ page }) => {
 });
 
 test("pages fit narrow screens", async ({ page }) => {
-  for (const path of ["/", "/isa", "/guide", "/license", "/review", "/faq", "/privacy", "/terms", "/docs", "/docs/review-rules", "/docs/checks", "/docs/troubleshooting", "/docs/glossary", "/try", "/workbench/program", "/workbench/simulate", "/workbench/compare"]) {
+  for (const path of ["/", "/isa", "/guide", "/license", "/review", "/faq", "/privacy", "/terms", "/accessibility", "/docs", "/docs/start", "/docs/review-rules", "/docs/checks", "/docs/troubleshooting", "/docs/glossary", "/waveforms", "/try", "/workbench/program", "/workbench/simulate", "/workbench/compare"]) {
     await page.goto(path);
     await noHorizontalScroll(page);
   }
@@ -221,7 +222,7 @@ test("legal pages, FAQ and the analytics opt-out", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Terms of use" })).toBeVisible();
   await page.goto("/faq");
   await page.getByText("How should I structure the .zip file?").click();
-  await expect(page.getByText(/Put all VHDL files of one design in one folder/)).toBeVisible();
+  await expect(page.getByText(/Put all source files of one design/)).toBeVisible();
   // Structured data is present and passes the CSP (no console errors).
   const ld = await page.locator('script[type="application/ld+json"]').allTextContents();
   expect(ld.some((t) => JSON.parse(t)["@type"] === "FAQPage")).toBe(true);
@@ -324,7 +325,10 @@ test("quick start opens each file where it belongs", async ({ page }) => {
   // A program and its waveform land on the comparison, already compared.
   await page.goto("/try");
   await expect(page.getByText(/First divergence/)).toBeVisible();
-  const source = await page.evaluate(() => JSON.parse(localStorage.getItem("pipelith:session:v1") ?? "{}").source as string);
+  // The session is saved with a short debounce: wait until the demo program is stored.
+  const stored = () => page.evaluate(() => (JSON.parse(localStorage.getItem("pipelith:session:v1") ?? "{}").source as string) ?? "");
+  await expect.poll(stored).toContain("PUSH R1");
+  const source = await stored();
   const wave = await (await page.request.get("/samples/memory.vcd.gz")).body();
   await page.goto("/");
   await page.getByLabel("Open files").setInputFiles([
@@ -357,7 +361,12 @@ test("documentation pages, navigation and footer", async ({ page, request }) => 
 
   await page.goto("/docs/review-rules#latch");
   await expect(page.locator("#latch")).toContainText("Possible latch");
-  await expect(page.locator(".rule")).toHaveCount(47);
+  await expect(page.locator(".rule")).toHaveCount(RULES.length);
+  // The language filter hides rules for other languages without a script.
+  await page.getByRole("radio", { name: "Verilog", exact: true }).check();
+  await expect(page.locator("#case-others")).toBeHidden();
+  await expect(page.locator("#ff-blocking")).toBeVisible();
+  await page.getByRole("radio", { name: "All languages" }).check();
   await page.goto("/docs/checks");
   await expect(page.getByRole("table")).toContainText("shouldn't be executed");
   await page.goto("/docs/glossary");
@@ -375,13 +384,136 @@ test("documentation pages, navigation and footer", async ({ page, request }) => 
   // Footer: three groups and the fine print, on every page.
   const footer = page.getByRole("contentinfo");
   for (const name of ["Product", "Docs", "Legal"]) await expect(footer.getByRole("heading", { name })).toBeVisible();
-  for (const name of ["Run the demo", "Review rules", "Privacy", "Terms", "MIT License"]) await expect(footer.getByRole("link", { name })).toBeVisible();
+  for (const name of ["Run the demo", "Waveforms", "Getting started", "Review rules", "Privacy", "Terms", "Accessibility", "MIT License"]) {
+    await expect(footer.getByRole("link", { name, exact: true })).toBeVisible();
+  }
   await expect(footer).toContainText(`© ${new Date().getFullYear()}`);
 
   const sitemap = await (await request.get("/sitemap.xml")).text();
-  for (const p of ["/docs</loc>", "/docs/review-rules</loc>", "/docs/glossary</loc>", "/docs/troubleshooting</loc>", "/docs/checks</loc>"]) expect(sitemap).toContain(p);
+  for (const p of ["/docs</loc>", "/docs/start</loc>", "/docs/review-rules</loc>", "/docs/glossary</loc>", "/docs/troubleshooting</loc>", "/docs/checks</loc>", "/waveforms</loc>", "/accessibility</loc>"]) {
+    expect(sitemap).toContain(p);
+  }
   const llms = await (await request.get("/llms.txt")).text();
   expect(llms).toContain("## Code review rules");
   expect(llms).toContain("## Glossary");
   expect(errors).toEqual([]);
+});
+
+test("the design language is on every page and drives the review sample, kit and docs", async ({ page }) => {
+  const errors = watchConsole(page);
+  for (const path of ["/", "/docs/start", "/privacy"]) {
+    await page.goto(path);
+    await expect(page.getByLabel("HDL (design language)")).toHaveValue("vhdl");
+  }
+  await page.goto("/review");
+  await page.getByLabel("HDL (design language)").selectOption("verilog");
+  await expect(page.locator(".toast")).toContainText("Design language: Verilog");
+  await page.getByRole("button", { name: "Try the reference processor" }).click();
+  await expect(page.getByText("Review of Reference processor (5-stage Verilog)")).toBeVisible();
+  await expect(page.getByText("The upload looks complete")).toBeVisible();
+  await expect(page.getByText(/17 Verilog files in \d+ folders/)).toBeVisible();
+  await expect(page.getByText("This looks like a 5-stage design")).toBeVisible();
+  await page.getByRole("button", { name: "Switch to 5 stages" }).click();
+  await expect(page.locator(".review-summary")).toContainText(/^0\s*errors\s*0\s*warnings/);
+
+  // Tabs follow the keyboard pattern.
+  await page.getByRole("tab", { name: /Findings/ }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Design overview" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tabpanel")).toContainText("Compile order");
+
+  // The kit is written in Verilog.
+  await page.goto("/workbench/program");
+  await page.getByRole("button", { name: /Memory and stack/ }).click();
+  await page.goto("/workbench/compare");
+  await expect(page.getByText(/Kit language:/)).toContainText("Verilog");
+  const [kit] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download hardware kit (.zip)" }).click()]);
+  expect(kit.suggestedFilename()).toBe("memory-and-stack-hardware-run.zip");
+
+  // The guide's language tabs show the same language.
+  await page.goto("/guide#hardware");
+  await expect(page.getByRole("tab", { name: "Verilog" }).first()).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("./run_icarus.sh path/to/your/rtl").first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a badly structured upload gets an AI prompt with file names and no code", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.goto("/review");
+  const files = [
+    { name: "top.v", mimeType: "text/plain", buffer: Buffer.from('`include "defs.vh"\nmodule top(input clk, output y); alu u (.a(clk), .y(y)); endmodule') },
+  ];
+  await page.locator('input[type="file"][accept=".zip,application/zip"]').setInputFiles(files);
+  await expect(page.getByText("Check the upload's structure")).toBeVisible();
+  await expect(page.locator(".notice").getByText(/1 include file is missing \(defs\.vh\)/)).toBeVisible();
+  // The prompt follows the files' language, not the (default) setting.
+  await expect(page.getByText("These files are Verilog, but VHDL is selected")).toBeVisible();
+  await page.getByText("Ask an AI assistant to fix the structure").click();
+  await page.getByRole("button", { name: "Copy prompt" }).click();
+  await expect(page.locator(".toast")).toContainText("Prompt copied");
+  const prompt = await page.evaluate(() => navigator.clipboard.readText());
+  expect(prompt).toContain("top.v");
+  expect(prompt).toContain("written in Verilog");
+  expect(prompt).toContain("zip -r my-cpu.zip my-cpu");
+  expect(prompt).toMatch(/include file is missing \(defs\.vh\)/);
+  expect(prompt).not.toContain("module top");
+
+  // An upload with no source files at all offers the prompt straight away.
+  await page.locator('input[type="file"][accept=".zip,application/zip"]').setInputFiles({ name: "notes.md", mimeType: "text/plain", buffer: Buffer.from("# notes") });
+  await expect(page.getByText("Nothing to review")).toBeVisible();
+});
+
+test("expected and simulated waveforms for the standard tests", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/waveforms");
+  const [expected] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: /6 stages \(\.vcd\) — expected waveform of Memory\.asm/ }).click()]);
+  expect(expected.suggestedFilename()).toBe("memory-expected-6stage.vcd");
+  expect((await page.request.get("/samples/verilog/memory.vcd.gz")).status()).toBe(200);
+
+  // The 5-stage bundled sample is the Verilog design, and it matches the model.
+  await page.goto("/workbench/program");
+  await page.getByRole("button", { name: /Memory and stack/ }).click();
+  await page.getByRole("radio", { name: /^5 stages/ }).first().check();
+  await page.goto("/workbench/simulate");
+  await expect(page.getByRole("button", { name: /Download expected waveform/ })).toBeVisible();
+  await page.goto("/workbench/compare");
+  await page.getByRole("radio", { name: "Bundled sample" }).check();
+  await page.getByRole("button", { name: "Load the waveform for Memory.asm" }).click();
+  await expect(page.getByText("The hardware matches the reference model")).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("display settings apply before the first paint and persist", async ({ page }) => {
+  const errors = watchConsole(page);
+  await page.goto("/");
+  await page.locator(".display-menu > summary").click();
+  await page.getByRole("radio", { name: "Dark" }).check();
+  await page.getByRole("radio", { name: "Larger" }).check();
+  await page.getByRole("radio", { name: /Atkinson Hyperlegible/ }).check();
+  await page.getByRole("radio", { name: "Reduce" }).check();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".display-menu")).not.toHaveAttribute("open", "");
+  await page.reload();
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-theme", "dark");
+  await expect(html).toHaveAttribute("data-text", "larger");
+  await expect(html).toHaveAttribute("data-font", "readable");
+  await expect(html).toHaveAttribute("data-motion", "reduce");
+  await noHorizontalScroll(page);
+  await page.evaluate(() => localStorage.removeItem("pipelith:display"));
+  expect(errors).toEqual([]);
+});
+
+test("skip link, focus and the smallest screens", async ({ page }) => {
+  await page.goto("/review");
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "Skip to content" });
+  await expect(skip).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/#main$/);
+  await page.setViewportSize({ width: 320, height: 640 });
+  for (const path of ["/", "/review", "/guide", "/waveforms", "/workbench/compare"]) {
+    await page.goto(path);
+    await noHorizontalScroll(page);
+  }
 });

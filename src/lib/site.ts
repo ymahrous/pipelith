@@ -16,11 +16,11 @@ export const SITE = {
   tagline: "Pipeline verification for RISC processors",
   url: siteUrl(),
   description:
-    "Pipelith is a free, browser-based tool to validate and test pipelined RISC processors: review VHDL code with suggested fixes, assemble and simulate programs on a reference ISA model, and compare your VHDL simulation's waveform against it. Supports 5- and 6-stage pipelines. No login; your files never leave the browser.",
+    "Pipelith is a free, browser-based tool to validate and test pipelined RISC processors written in VHDL, Verilog or SystemVerilog: review the code with suggested fixes, assemble and simulate programs on a reference ISA model, generate expected waveforms, and compare your simulation's waveform against the model. Supports 5- and 6-stage pipelines. No login; your files never leave the browser.",
   author: "Yousef Mahrous",
   repo: "https://github.com/ymahrous/risc-pipelined-processor",
-  legalUpdated: "2026-10-05",
-  legalUpdatedText: "5 October 2026",
+  legalUpdated: "2026-10-12",
+  legalUpdatedText: "12 October 2026",
 };
 
 /** Vercel analytics run only on Vercel, and can be switched off with an env var. */

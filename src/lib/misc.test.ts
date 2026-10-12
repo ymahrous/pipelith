@@ -207,3 +207,65 @@ describe("documentation examples", () => {
     expect(s.forwarding).toEqual(base.forwarding);
   });
 });
+
+describe("design language", () => {
+  it("defaults to VHDL, validates stored values and survives a new program", async () => {
+    const { withProgram, withHdl } = await import("./session/session");
+    expect(emptySession().hdl).toBe("vhdl");
+    expect(parseSession({ v: 1, hdl: "verilog" })!.hdl).toBe("verilog");
+    expect(parseSession({ v: 1, hdl: "vhdl; rm -rf" })!.hdl).toBe("vhdl");
+    const s = withProgram({ ...emptySession(), hdl: "systemverilog" }, { name: "x", source: "HLT" });
+    expect(s.hdl).toBe("systemverilog");
+    const vhdlOrder = { ...emptySession(), compileOrder: ["a.vhd", "b.vhd"] };
+    expect(withHdl(vhdlOrder, "verilog").compileOrder).toBeNull();
+    expect(withHdl({ ...emptySession(), compileOrder: ["a.v"] }, "systemverilog").compileOrder).toEqual(["a.v"]);
+  });
+  it("records the language in reports", () => {
+    const s = { ...emptySession(), source: EXAMPLES[0].source, hdl: "verilog" as const };
+    const md = reportToMarkdown(buildReport(s, analyze(s), null, new Date(0)));
+    expect(md).toContain("design language Verilog");
+  });
+});
+
+describe("Verilog and SystemVerilog testbenches", () => {
+  const make = (hdl: "verilog" | "systemverilog") =>
+    generateTestbench({
+      profile: risc6,
+      memFileName: "program.mem",
+      inputs: new Map([[0xa3, [5]], [0xa4, [0x10, 0x11]]]),
+      interrupts: [{ pc: 0xa5, occurrence: 2 }],
+      cycles: 200,
+      rtlRoot: "rtl",
+      stages: 5,
+      forwardingNote: "full forwarding (EX/MEM, MEM/WB)",
+      hdl,
+    });
+  it("writes a Verilog-2005 testbench with Icarus, Verilator and ModelSim scripts", () => {
+    const tb = make("verilog");
+    expect(tb.files.map((f) => f.name)).toEqual(["tb_processor.v", "run_icarus.sh", "run_verilator.sh", "run_modelsim.do", "README.txt"]);
+    const v = tb.files[0].content;
+    expect(v).toContain("module tb_processor;");
+    expect(v).toContain("32'h000000A3: in_port = 32'h00000005;");
+    expect(v).toContain("#210;");
+    expect(v).toContain("assign pc_mon = uut.pc_out;");
+    expect(v).toContain(".intr(intr)");
+    expect(v).toMatch(/if \(seen0 == 2\) irq_pulse = 1'b1;/);
+    expect(v).toContain('$dumpfile("wave.vcd");');
+    expect(tb.files[1].content).toContain("iverilog -g2005");
+    expect(tb.files[1].content.match(/^ {2}"\$RTL\//gm)?.length).toBe(risc6.hardware.verilog!.compileOrder.length);
+    expect(tb.files[2].content).toContain("+1364-2005ext+v");
+    expect(tb.notes.join()).toMatch(/different values/);
+  });
+  it("writes SystemVerilog with logic, -g2012 and vlog -sv, and the .sv design files", () => {
+    const tb = make("systemverilog");
+    expect(tb.files[0].name).toBe("tb_processor.sv");
+    expect(tb.files[0].content).toContain("logic        clk = 1'b1;");
+    expect(tb.files[1].content).toContain("iverilog -g2012");
+    expect(tb.files[1].content).toContain('"$RTL/processor.sv"');
+    expect(tb.files[3].content).toContain("vlog -sv");
+  });
+  it("keeps VHDL kits unchanged by default", () => {
+    const tb = generateTestbench({ profile: risc6, memFileName: "program.mem", inputs: new Map(), interrupts: [], cycles: 100, rtlRoot: "src/rtl" });
+    expect(tb.files.map((f) => f.name)).toEqual(["tb_processor.vhd", "run_ghdl.sh", "run_modelsim.do", "README.txt"]);
+  });
+});

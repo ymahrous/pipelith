@@ -14,8 +14,17 @@ import { useWorkbench } from "./SessionProvider";
 /** The bundled test the demo opens; its GHDL waveform ships in /public/samples. */
 export const DEMO_EXAMPLE = "memory";
 
-export async function fetchSampleWave(id: string): Promise<Blob> {
-  const res = await fetch(`/samples/${id}.vcd.gz`);
+/**
+ * Reference-design waveforms of the bundled tests: the 6-stage VHDL processor
+ * (GHDL) in /samples, the 5-stage Verilog processor (Icarus Verilog) in /samples/verilog.
+ */
+export const SAMPLE_DESIGNS = {
+  6: { dir: "/samples", label: "GHDL, 6-stage VHDL reference", sim: "GHDL 4.1", design: "the 6-stage VHDL reference processor" },
+  5: { dir: "/samples/verilog", label: "Icarus Verilog, 5-stage Verilog reference", sim: "Icarus Verilog 12", design: "the 5-stage Verilog reference processor" },
+} as const;
+
+export async function fetchSampleWave(id: string, depth: 5 | 6 = 6): Promise<Blob> {
+  const res = await fetch(`${SAMPLE_DESIGNS[depth].dir}/${id}.vcd.gz`);
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
   return new Response(res.body.pipeThrough(new DecompressionStream("gzip"))).blob();
 }

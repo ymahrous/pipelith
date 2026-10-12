@@ -17,6 +17,7 @@ const TOC = [
   ["output", "Results and generated files"],
   ["license", "Software license"],
   ["third", "Third-party tools and services"],
+  ["trademarks", "Trademarks"],
   ["warranty", "No warranty"],
   ["liability", "Limitation of liability"],
   ["changes", "Changes and availability"],
@@ -45,8 +46,9 @@ export default function TermsPage() {
           <section id="service" className="stack stack--tight">
             <h2>2. The service</h2>
             <p>
-              Pipelith helps you review, assemble, simulate and compare pipelined processor designs. It is free,
-              needs no account, and runs in your browser. Features may change over time.
+              Pipelith helps you review, assemble, simulate and compare pipelined processor designs written in VHDL,
+              Verilog or SystemVerilog. It is free, needs no account, and runs in your browser. Features may change over time.
+              We aim to make it usable by everyone; see the <Link href="/accessibility">accessibility statement</Link>.
             </p>
           </section>
 
@@ -83,10 +85,10 @@ export default function TermsPage() {
           <section id="output" className="stack stack--tight">
             <h2>5. Results and generated files</h2>
             <p>
-              Reviews, simulations, timing estimates, comparisons, testbenches, scripts and reports are produced
-              automatically. They can be incomplete or wrong — static analysis can miss bugs and report false positives,
-              and the reference model and timing estimate are interpretations of a specification. You may use generated
-              files for any purpose. The guide, documentation, rule descriptions and troubleshooting advice are general
+              Reviews, simulations, timing estimates, expected waveforms, comparisons, testbenches, scripts, AI prompts and
+              reports are produced automatically. They can be incomplete or wrong — static analysis can miss bugs and report
+              false positives, and the reference model, the timing estimate and the expected waveforms are interpretations of a
+              specification. You may use generated files for any purpose. The guide, documentation, rule descriptions and troubleshooting advice are general
               information, not a guarantee that following them makes a design correct. Read generated scripts before running
               them, and{" "}
               <strong>
@@ -108,14 +110,25 @@ export default function TermsPage() {
           <section id="third" className="stack stack--tight">
             <h2>7. Third-party tools and services</h2>
             <p>
-              The hardware step relies on simulators such as GHDL, ModelSim, Questa or Vivado, which you obtain and run
-              under their own terms. The site may be hosted and measured by Vercel as described in the privacy policy. Links
-              to other sites are provided for convenience; we aren&apos;t responsible for their content.
+              The hardware step relies on simulators such as GHDL, Icarus Verilog, Verilator, ModelSim, Questa or Vivado, and
+              waveform viewers such as GTKWave or Surfer, which you obtain and run under their own terms. If you paste a prompt
+              into an AI assistant, that service&apos;s terms apply, and its answers are its own: check them before you act on
+              them. The site may be hosted and measured by Vercel as described in the privacy policy. Links to other sites are
+              provided for convenience; we aren&apos;t responsible for their content.
+            </p>
+          </section>
+
+          <section id="trademarks" className="stack stack--tight">
+            <h2>8. Trademarks</h2>
+            <p>
+              VHDL, Verilog and SystemVerilog are IEEE standards. ModelSim and Questa are trademarks of Siemens, Vivado of AMD,
+              and the AI assistants named on this site belong to their makers. Names are used only to say what Pipelith works
+              with; no endorsement is implied.
             </p>
           </section>
 
           <section id="warranty" className="stack stack--tight">
-            <h2>8. No warranty</h2>
+            <h2>9. No warranty</h2>
             <p>
               The site and everything it produces are provided <strong>“as is” and “as available”</strong>, without
               warranties of any kind, express or implied, including fitness for a particular purpose, accuracy and
@@ -124,7 +137,7 @@ export default function TermsPage() {
           </section>
 
           <section id="liability" className="stack stack--tight">
-            <h2>9. Limitation of liability</h2>
+            <h2>10. Limitation of liability</h2>
             <p>
               To the extent the law allows, we are not liable for indirect, incidental or consequential damages, or for loss
               of data, profits or time, arising from use of the site or its results. Because the service is free, our total
@@ -134,7 +147,7 @@ export default function TermsPage() {
           </section>
 
           <section id="changes" className="stack stack--tight">
-            <h2>10. Changes and availability</h2>
+            <h2>11. Changes and availability</h2>
             <p>
               We may change, suspend or stop the site, or update these terms. The date at the top shows the latest version;
               continuing to use the site after a change means you accept it. Nothing you store lives on our side, so a
@@ -143,7 +156,7 @@ export default function TermsPage() {
           </section>
 
           <section id="law" className="stack stack--tight">
-            <h2>11. Governing law</h2>
+            <h2>12. Governing law</h2>
             <p>
               These terms are governed by the laws that apply at the operator&apos;s place of residence, without prejudice to
               mandatory consumer protection rules of the country where you live. If a provision is found invalid, the rest
@@ -152,7 +165,7 @@ export default function TermsPage() {
           </section>
 
           <section id="contact" className="stack stack--tight">
-            <h2>12. Contact</h2>
+            <h2>13. Contact</h2>
             <p>
               Questions about these terms: open an issue or use the contact details on the project&apos;s{" "}
               <a href={SITE.repo}>GitHub page</a>.

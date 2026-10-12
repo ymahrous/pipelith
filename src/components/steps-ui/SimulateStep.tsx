@@ -9,6 +9,7 @@ import { StepFrame } from "../StepFrame";
 import { Badge, Empty, h8, hx } from "../ui";
 import { PipelineSettings } from "../DepthPicker";
 import { PipelineTiming } from "../PipelineTiming";
+import { ExpectedWaveButton } from "../ExpectedWaveButton";
 
 const HALT_TEXT = {
   hlt: "Reached HLT",
@@ -336,6 +337,20 @@ export function SimulateStep() {
               </div>
               <PipelineSettings legend="Timing for" />
               <PipelineTiming timing={analysis.timing} />
+              <div className="panel stack stack--tight">
+                <h3>Expected waveform</h3>
+                <p className="small">
+                  What a correct {session.stages}-stage design with this forwarding should show for this program: clock, reset,
+                  fetch PC, every register, SP, flags, OUT, memory writes and the instruction in each stage, cycle by cycle. Open it
+                  in GTKWave or Surfer next to your own simulation — no simulator or RTL needed to make it.
+                </p>
+                <div className="btn-row">
+                  <ExpectedWaveButton />
+                  <Link className="btn btn--ghost" href="/waveforms">
+                    Waveforms for every standard test
+                  </Link>
+                </div>
+              </div>
             </section>
           )}
         </div>

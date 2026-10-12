@@ -3,7 +3,7 @@ import { CompareStep } from "@/components/steps-ui/CompareStep";
 
 export const metadata: Metadata = {
   title: "Compare",
-  description: "Compare your VHDL simulation waveform or final register values with the reference model and find the first divergence.",
+  description: "Compare your VHDL, Verilog or SystemVerilog simulation waveform or final register values with the reference model and find the first divergence.",
   alternates: { canonical: "/workbench/compare" },
 };
 

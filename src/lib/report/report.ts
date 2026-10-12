@@ -8,11 +8,14 @@ import type { Analysis } from "../session/analyze";
 import type { Session } from "../session/session";
 import { flagsToString } from "../sim/simulator";
 import { hex } from "../asm/assembler";
+import { HDL_INFO } from "../hdl";
 
 export interface ReportData {
   generatedAt: string;
   program: string;
   processor: string;
+  /** Design language the kit and samples were set up for. */
+  language: string;
   pipeline: { stages: number; forwarding: string; estimatedCycles: number | null; cpi: number | null; stalls: Record<string, number> | null; hardwareCycles: number | null; timingVerdict: string | null };
   options: Session["options"];
   assembly: { words: number; errors: number; warnings: number; diagnostics: { line: number; severity: string; message: string }[] };
@@ -41,6 +44,7 @@ export function buildReport(
     generatedAt: now.toISOString(),
     program: s.name,
     processor: a.profile.name,
+    language: HDL_INFO[s.hdl].label,
     pipeline: {
       stages: s.stages,
       forwarding: describeForwarding(geometry(s.stages), s.forwarding),
@@ -108,7 +112,7 @@ const esc = (s: string) => s.replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 export function reportToMarkdown(d: ReportData): string {
   const L: string[] = [];
   L.push(`# Validation report: ${esc(d.program)}`, "");
-  L.push(`- Processor: ${d.processor}, ${d.pipeline.stages}-stage pipeline, ${d.pipeline.forwarding}`);
+  L.push(`- Processor: ${d.processor}, ${d.pipeline.stages}-stage pipeline, ${d.pipeline.forwarding}; design language ${d.language}`);
   if (d.pipeline.estimatedCycles !== null) {
     L.push(`- Timing estimate: ${d.pipeline.estimatedCycles} cycles (CPI ${d.pipeline.cpi})${d.pipeline.hardwareCycles !== null ? `; hardware finished at cycle ${d.pipeline.hardwareCycles}` : ""}`);
   }

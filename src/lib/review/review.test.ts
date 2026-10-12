@@ -187,15 +187,15 @@ describe("intake safety", () => {
     expect(cleanPath("../../etc/passwd")).toBe("etc/passwd");
     expect(cleanPath("C:\\x\\..\\y.vhd")).toBe("C:/x/y.vhd");
   });
-  it("reads stored zips and skips non-HDL and Verilog files", async () => {
+  it("reads stored zips: HDL files in any language, nothing else", async () => {
     const z = createZip([
       { name: "rtl/a.vhd", content: "entity a is end;" },
       { name: "rtl/b.v", content: "module b; endmodule" },
       { name: "README.md", content: "hi" },
     ]);
     const r = await readZip(new Blob([z]));
-    expect(r.files.map((f) => f.path)).toEqual(["rtl/a.vhd"]);
-    expect(r.skipped[0].reason).toMatch(/Verilog/);
+    expect(r.files.map((f) => f.path)).toEqual(["rtl/a.vhd", "rtl/b.v"]);
+    expect(r.skipped).toEqual([]);
   });
   it("rejects files that are not zips", async () => {
     await expect(readZip(new Blob(["not a zip at all"]))).rejects.toThrow(/not a \.zip/);

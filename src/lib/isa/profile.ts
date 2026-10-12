@@ -90,6 +90,12 @@ export interface HardwareBinding {
   clockPeriodNs: number;
   /** VHDL files in compile order, relative to the RTL root. */
   compileOrder: string[];
+  /**
+   * The Verilog/SystemVerilog design of the same processor: names that differ
+   * from the VHDL one (SystemVerilog reserves `int`), its include file and its
+   * files in compile order (`.v`; the SystemVerilog design uses `.sv`/`.svh`).
+   */
+  verilog?: { interruptPort: string; compileOrder: string[] };
 }
 
 export const FLAG_ORDER: Flag[] = ["Z", "N", "C"];

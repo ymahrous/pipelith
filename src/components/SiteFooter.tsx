@@ -9,11 +9,13 @@ const GROUPS: { title: string; links: [string, string][] }[] = [
       ["Run the demo", "/try"],
       ["Workbench", "/workbench/program"],
       ["Code review", "/review"],
+      ["Waveforms", "/waveforms"],
     ],
   },
   {
     title: "Docs",
     links: [
+      ["Getting started", "/docs/start"],
       ["Guide", "/guide"],
       ["Review rules", "/docs/review-rules"],
       ["Troubleshooting", "/docs/troubleshooting"],
@@ -25,6 +27,7 @@ const GROUPS: { title: string; links: [string, string][] }[] = [
     links: [
       ["Privacy", "/privacy"],
       ["Terms", "/terms"],
+      ["Accessibility", "/accessibility"],
       ["MIT License", "/license"],
     ],
   },

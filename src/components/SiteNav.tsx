@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/workbench/program", match: ["/workbench"], label: "Workbench" },
   { href: "/review", match: ["/review"], label: "Code review" },
-  { href: "/docs", match: ["/docs", "/guide", "/isa"], label: "Docs" },
+  { href: "/docs", match: ["/docs", "/guide", "/isa", "/waveforms"], label: "Docs" },
   { href: "/faq", match: ["/faq"], label: "FAQ" },
 ];
 

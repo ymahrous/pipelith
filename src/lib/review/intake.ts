@@ -1,5 +1,6 @@
 /**
- * Codebase intake for Code review: a .zip, a picked folder, or loose files.
+ * Codebase intake for Code review: a .zip, a picked folder, or loose files,
+ * in VHDL, Verilog or SystemVerilog (or a mix).
  *
  * Everything is read in the browser. ZIP entries are inflated with the
  * platform's DecompressionStream and every size is capped, so a crafted
@@ -7,17 +8,22 @@
  * Paths are only ever used as display labels.
  */
 
+import { hdlOfPath } from "../hdl";
+
 export interface SourceFile {
   path: string;
   text: string;
 }
 
 export interface IntakeResult {
+  /** HDL sources: .vhd/.vhdl/.vho, .v/.vh, .sv/.svh. */
   files: SourceFile[];
-  /** Files present but not reviewed (other languages, binaries, too large). */
+  /** Files present but not reviewed (binaries, too large, encrypted). */
   skipped: { path: string; reason: string }[];
   /** Assembly test programs found alongside the RTL. */
   programs: SourceFile[];
+  /** Names of other files in the upload (documents, scripts, images …), for the AI restructuring prompt. */
+  ignored: string[];
 }
 
 export const REVIEW_LIMITS = {
@@ -30,10 +36,8 @@ export const REVIEW_LIMITS = {
 
 export class IntakeError extends Error {}
 
-const VHDL = /\.(vhd|vhdl|vho)$/i;
 const ASM = /\.(asm|s)$/i;
-const OTHER_HDL = /\.(v|sv|svh|vh)$/i;
-const IGNORE_DIRS = /(^|\/)(\.git|node_modules|__MACOSX|work|\.Xil|xsim\.dir|db|incremental_db)\//i;
+const IGNORE_DIRS = /(^|\/)(\.git|node_modules|__MACOSX|work|\.Xil|xsim\.dir|db|incremental_db|obj_dir|sim_build)\//i;
 
 /** Normalise a path for display: forward slashes, no leading ./ or /, no .. segments. */
 export function cleanPath(p: string): string {
@@ -45,11 +49,10 @@ export function cleanPath(p: string): string {
     .slice(0, 300);
 }
 
-function classify(path: string): "vhdl" | "asm" | "other-hdl" | "skip" {
+function classify(path: string): "hdl" | "asm" | "skip" {
   if (IGNORE_DIRS.test("/" + path)) return "skip";
-  if (VHDL.test(path)) return "vhdl";
+  if (hdlOfPath(path)) return "hdl";
   if (ASM.test(path)) return "asm";
-  if (OTHER_HDL.test(path)) return "other-hdl";
   return "skip";
 }
 
@@ -57,16 +60,18 @@ function looksBinary(text: string) {
   return text.slice(0, 4096).includes("\u0000");
 }
 
+const MAX_IGNORED = 2000;
+
 class Collector {
-  out: IntakeResult = { files: [], skipped: [], programs: [] };
+  out: IntakeResult = { files: [], skipped: [], programs: [], ignored: [] };
   total = 0;
+  /** Note a file that isn't read, unless it is tool output or version control. */
+  ignore(path: string) {
+    if (path && !IGNORE_DIRS.test("/" + path) && this.out.ignored.length < MAX_IGNORED) this.out.ignored.push(path);
+  }
   add(path: string, text: string) {
     const kind = classify(path);
     if (kind === "skip") return;
-    if (kind === "other-hdl") {
-      this.out.skipped.push({ path, reason: "Verilog/SystemVerilog is not reviewed yet" });
-      return;
-    }
     if (looksBinary(text)) {
       this.out.skipped.push({ path, reason: "Not a text file" });
       return;
@@ -75,7 +80,7 @@ class Collector {
     if (this.total > REVIEW_LIMITS.totalBytes) throw new IntakeError("The codebase is larger than 40 MB of source. Upload the RTL folder only.");
     if (kind === "asm") this.out.programs.push({ path, text });
     else {
-      if (this.out.files.length >= REVIEW_LIMITS.files) throw new IntakeError(`More than ${REVIEW_LIMITS.files} VHDL files. Upload the RTL folder only.`);
+      if (this.out.files.length >= REVIEW_LIMITS.files) throw new IntakeError(`More than ${REVIEW_LIMITS.files} HDL files. Upload the RTL folder only.`);
       this.out.files.push({ path, text });
     }
   }
@@ -94,9 +99,13 @@ export async function readFileList(list: Iterable<File>): Promise<IntakeResult> 
       for (const x of inner.files) c.add(x.path, x.text);
       for (const x of inner.programs) c.add(x.path, x.text);
       c.out.skipped.push(...inner.skipped);
+      for (const x of inner.ignored) c.ignore(x);
       continue;
     }
-    if (!c.wants(path)) continue;
+    if (!c.wants(path)) {
+      c.ignore(path);
+      continue;
+    }
     if (f.size > REVIEW_LIMITS.fileBytes) {
       c.out.skipped.push({ path, reason: "Larger than 2 MB" });
       continue;
@@ -109,6 +118,7 @@ export async function readFileList(list: Iterable<File>): Promise<IntakeResult> 
 function finish(r: IntakeResult): IntakeResult {
   r.files.sort((a, b) => a.path.localeCompare(b.path));
   r.programs.sort((a, b) => a.path.localeCompare(b.path));
+  r.ignored.sort((a, b) => a.localeCompare(b));
   return r;
 }
 
@@ -169,7 +179,11 @@ export async function readZip(blob: Blob): Promise<IntakeResult> {
     const rawName = dec.decode(buf.subarray(p + 46, p + 46 + nlen));
     p += 46 + nlen + xlen + clen;
     const path = cleanPath(rawName);
-    if (!path || rawName.endsWith("/") || !c.wants(path)) continue;
+    if (!path || rawName.endsWith("/")) continue;
+    if (!c.wants(path)) {
+      c.ignore(path);
+      continue;
+    }
     if (flags & 1) {
       c.out.skipped.push({ path, reason: "Encrypted" });
       continue;

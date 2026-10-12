@@ -13,7 +13,7 @@ export const FAQ: FaqItem[] = [
   {
     group: "Basics",
     q: "What is Pipelith?",
-    a: "Pipelith is a free web app for validating and testing pipelined RISC processors written in VHDL. It reviews your code for bugs and suggests fixes, runs programs on a reference model of the instruction set, and compares your design's simulation waveform with that model to find the first instruction where they disagree.",
+    a: "Pipelith is a free web app for validating and testing pipelined RISC processors written in VHDL, Verilog or SystemVerilog. It reviews your code for bugs and suggests fixes, runs programs on a reference model of the instruction set, shows the waveform a correct pipeline should produce, and compares your design's simulation with the model to find the first instruction where they disagree.",
   },
   {
     group: "Basics",
@@ -23,7 +23,7 @@ export const FAQ: FaqItem[] = [
   {
     group: "Basics",
     q: "Can I just drop my files somewhere?",
-    a: "Yes. Drop files on the home page and Pipelith opens each where it belongs: a .zip or .vhd files go to Code review, an .asm or .mem program to Assemble, a program together with its wave.vcd (or a .txt of final register values) straight to Compare.",
+    a: "Yes. Drop files on the home page and Pipelith opens each where it belongs: a .zip or .vhd, .v or .sv files go to Code review, an .asm or .mem program to Assemble, a program together with its wave.vcd (or a .txt of final register values) straight to Compare.",
   },
   {
     group: "Basics",
@@ -42,28 +42,48 @@ export const FAQ: FaqItem[] = [
   },
   {
     group: "Basics",
+    q: "Which design languages does it support?",
+    a: "VHDL, Verilog and SystemVerilog. Choose yours with HDL at the top of any page: the hardware kit, sample codebases and examples follow it. Code review reads every language it finds, so mixed VHDL and Verilog designs work too.",
+  },
+  {
+    group: "Basics",
     q: "Which simulators can I use for the hardware step?",
-    a: "GHDL, ModelSim and Questa have ready-made scripts in the hardware kit. Vivado's simulator, Icarus-based flows and anything else that writes a standard VCD file work as well.",
+    a: "The hardware kit has ready-made scripts for GHDL (VHDL), Icarus Verilog and Verilator (Verilog and SystemVerilog), and ModelSim or Questa (all three). The Vivado simulator works with the commands in the guide, and anything else that writes a standard VCD file works as well.",
+  },
+  {
+    group: "Basics",
+    q: "I'm new to digital design. Where do I start?",
+    a: "Start with Getting started in the docs: it explains what a pipeline is, which free tools to install for your language, and walks you through a first check in about ten minutes. Every term has a one-sentence definition in the glossary.",
+  },
+  {
+    group: "Basics",
+    q: "Is Pipelith accessible?",
+    a: "Yes, it aims to meet WCAG 2.2 level AA: everything works with a keyboard and a screen reader, and Display settings at the top of every page offer dark mode, larger text, a high-legibility typeface (Atkinson Hyperlegible) and reduced motion. The accessibility statement lists known limitations and how to report a problem.",
   },
   {
     group: "Uploads",
     q: "What do I need to upload for a code review?",
-    a: "Upload your whole VHDL design: every .vhd or .vhdl file, including all packages and components, as a .zip, a folder or individual files. Any folder layout works. Testbenches and .asm programs may be included; other files are ignored.",
+    a: "Upload your whole design: every .vhd/.vhdl, .v or .sv file, including all packages, `include headers (.vh, .svh) and components, as a .zip, a folder or individual files. Any folder layout works. Testbenches and .asm programs may be included; other files are ignored.",
   },
   {
     group: "Uploads",
     q: "How should I structure the .zip file?",
-    a: "Put all VHDL files of one design in one folder (subfolders are fine) and zip that folder. Include every package your files use and every component they instantiate. Leave out zips inside the zip, password protection and other archive formats. The Code review page has an example layout and step-by-step instructions for Windows, macOS and Linux.",
+    a: "Put all source files of one design (VHDL, Verilog or SystemVerilog) in one folder (subfolders are fine) and zip that folder. Include every package and header your files use and every unit they instantiate. Leave out zips inside the zip, password protection and other archive formats. The Code review page has an example layout for your language and step-by-step instructions for Windows, macOS and Linux.",
   },
   {
     group: "Uploads",
     q: "Why does the review say a package or unit is missing?",
-    a: "Because a file uses a package (use work.name) or instantiates an entity that no uploaded file defines. Add that file to the upload and run the review again. Vendor primitives from libraries such as unisim are reported as warnings because they can't be included.",
+    a: "Because a file uses a package (use work.name, import name::*), includes a header (`include) or instantiates an entity or module that no uploaded file defines. Add that file to the upload and run the review again. Vendor primitives (unisim, BUFG, altsyncram and similar) are reported as warnings because they can't be included.",
   },
   {
     group: "Uploads",
     q: "Does it review Verilog or SystemVerilog?",
-    a: "Not yet. Verilog and SystemVerilog files are listed as skipped; only VHDL is reviewed.",
+    a: "Yes. Verilog-2005 and SystemVerilog files are reviewed after macros, `ifdef and `include are expanded. Besides the checks VHDL gets (connections, widths, multiple drivers, latches, sensitivity lists, pipeline structure), Verilog has its own: blocking assignments in clocked blocks, non-blocking ones in combinational logic, wires assigned in always blocks, regs driven by assign, implicit 1-bit nets and always blocks with no events.",
+  },
+  {
+    group: "Uploads",
+    q: "My upload isn't structured the way the review wants. Can an AI help?",
+    a: "Yes. When the structure check finds a problem — or nothing could be read — it offers a ready-made prompt for any AI assistant (ChatGPT, Claude, Gemini, Copilot …). The prompt lists your file names, your language and depth, and what was wrong, and asks for the moves and a script to make them; it contains none of your code, and Pipelith never sends it anywhere: you copy it yourself.",
   },
   {
     group: "Pipeline",
@@ -84,6 +104,11 @@ export const FAQ: FaqItem[] = [
     group: "Results",
     q: "How does the waveform comparison work if my pipeline has different timing?",
     a: "It compares the sequence of values each register, the stack pointer, the flags and the OUT port take, not the cycle in which they change. If R3 goes 0, 19, 5 in the model it must go 0, 19, 5 in the waveform, whenever that happens.",
+  },
+  {
+    group: "Results",
+    q: "Can I see what a correct waveform looks like?",
+    a: "Yes. Download an expected waveform: what a correct 5- or 6-stage design with your forwarding setting should show, built from the reference model and the timing estimate. Simulate has one for the open program, and the Standard test waveforms page has them for every standard test, along with real simulations of the bundled VHDL and Verilog reference designs.",
   },
   {
     group: "Results",
@@ -108,6 +133,6 @@ export const FAQ: FaqItem[] = [
   {
     group: "Privacy & security",
     q: "Is it safe to run the generated scripts?",
-    a: "Yes, they are short and only call GHDL or ModelSim on the files in the kit and the folder you name. Every value placed in them is checked against a strict allow-list, and you can read them before running.",
+    a: "Yes, they are short and only call the simulator (GHDL, Icarus Verilog, Verilator or ModelSim) on the files in the kit and the folder you name. Every value placed in them is checked against a strict allow-list, and you can read them before running.",
   },
 ];

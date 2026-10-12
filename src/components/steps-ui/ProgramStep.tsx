@@ -149,7 +149,7 @@ export function ProgramStep() {
           ) : null}
           {session.sourceKind === "mem" && (
             <p className="muted small">
-              A .mem file is one 32-bit binary word per line, as the VHDL memory loads it. It is disassembled in the next
+              A .mem file is one 32-bit binary word per line, as the processor&apos;s memory loads it ($readmemb in Verilog, textio in VHDL). It is disassembled in the next
               step; checks from comments need assembly source.
             </p>
           )}
@@ -199,7 +199,7 @@ export function ProgramStep() {
                 <code>.mem</code>
               </dt>
               <dd>
-                An assembled image: one 32-bit binary word per line, starting at address 0 — the file your VHDL memory
+                An assembled image: one 32-bit binary word per line, starting at address 0 — the file your memory model
                 loads. No comments, so no automatic checks. Up to 4096 words.
               </dd>
             </dl>

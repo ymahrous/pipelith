@@ -5,6 +5,8 @@ describe("quick start routing", () => {
   it("sends codebases to code review", () => {
     expect(routeFiles(["cpu.zip"]).kind).toBe("review");
     expect(routeFiles(["alu.vhd", "cpu.VHDL", "test.asm"])).toEqual({ kind: "review", files: [0, 1, 2] });
+    expect(routeFiles(["alu.v", "defs.vh"])).toEqual({ kind: "review", files: [0, 1] });
+    expect(routeFiles(["core.sv", "pkg.svh", "notes.txt"]).kind).toBe("review");
   });
   it("opens programs, waveforms and final values", () => {
     expect(routeFiles(["t.asm"])).toEqual({ kind: "program", program: 0 });

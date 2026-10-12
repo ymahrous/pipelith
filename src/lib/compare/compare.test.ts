@@ -87,3 +87,24 @@ describe("timing against the selected depth", () => {
     expect(Math.abs(six.ratio - 1)).toBeLessThan(Math.abs(five.ratio - 1));
   });
 });
+
+describe("the 5-stage Verilog reference design's waveforms (Icarus Verilog)", () => {
+  const verilog = (id: string) => {
+    const ex = EXAMPLES.find((e) => e.id === id)!;
+    const a = analyze({ ...emptySession(), source: ex.source, stages: 5 });
+    const text = gunzipSync(readFileSync(join(__dirname, "../../../public/samples/verilog", `${id}.vcd.gz`))).toString("utf8");
+    const p = new VcdParser((s) => mappedPaths(autoMap(s, a.profile.hardware, 5)));
+    p.push(text);
+    const vcd = p.end();
+    return { a, rep: compareTrace(a.sim!, vcd, autoMap(vcd.signals, a.profile.hardware, 5), 8, new Set(a.memory.keys())) };
+  };
+  for (const ex of EXAMPLES) {
+    it(`${ex.file}: every channel matches and the cycle count fits 5 stages`, async () => {
+      const { judgeTiming } = await import("./compare");
+      const { estimateTiming } = await import("../pipeline/pipeline");
+      const { a, rep } = verilog(ex.id);
+      expect(rep.channels.filter((c) => c.status !== "match").map((c) => c.label)).toEqual([]);
+      expect(judgeTiming(rep.lastChangeCycle!, estimateTiming(a.sim!, a.profile, 5).lastResultCycle, 5).tone).toBe("ok");
+    });
+  }
+});

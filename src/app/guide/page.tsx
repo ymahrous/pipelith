@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GOALS, REVIEW_OPTION } from "@/components/goals";
+import { HdlTabs } from "@/components/HdlTabs";
 import { geometry } from "@/lib/pipeline/pipeline";
 import { ZipGuide } from "@/components/review/ZipGuide";
 import { JsonLd } from "@/components/JsonLd";
@@ -10,7 +11,7 @@ import { STEPS } from "@/components/steps";
 export const metadata: Metadata = {
   title: "Guide",
   description:
-    "How to use Pipelith: what each option needs, how to structure a .zip for code review, 5- vs 6-stage pipelines, forwarding settings, running GHDL or ModelSim, and reading results.",
+    "How to use Pipelith with VHDL, Verilog or SystemVerilog: what each option needs, structuring a .zip for code review, 5- vs 6-stage pipelines, forwarding, expected waveforms, running GHDL, Icarus Verilog, Verilator or ModelSim, and reading results.",
   alternates: { canonical: "/guide" },
 };
 
@@ -18,13 +19,16 @@ const TOC = [
   ["needs", "What you need"],
   ["flow", "How a validation run works"],
   ["depth", "5 or 6 pipeline stages"],
+  ["language", "VHDL, Verilog or SystemVerilog"],
   ["review", "Code review"],
   ["zip", "Structuring the .zip"],
   ["forwarding", "Forwarding settings"],
   ["comments", "Writing checks as comments"],
+  ["waveforms", "Expected waveforms"],
   ["hardware", "Running your hardware"],
   ["reading", "Reading the comparison"],
   ["other", "Using it with another processor"],
+  ["display", "Display and accessibility"],
   ["privacy", "Privacy and security"],
   ["limits", "Limits"],
 ] as const;
@@ -37,8 +41,12 @@ export default function GuidePage() {
           "@context": "https://schema.org",
           "@type": "HowTo",
           name: "Validate a pipelined RISC processor against its instruction set",
-          description: "Run a program on the reference model, simulate your VHDL with a generated testbench, and compare the results.",
-          tool: [{ "@type": "HowToTool", name: "GHDL, ModelSim or Questa" }],
+          description: "Run a program on the reference model, simulate your VHDL, Verilog or SystemVerilog design with a generated testbench, and compare the results.",
+          tool: [
+            { "@type": "HowToTool", name: "GHDL (VHDL)" },
+            { "@type": "HowToTool", name: "Icarus Verilog or Verilator (Verilog, SystemVerilog)" },
+            { "@type": "HowToTool", name: "ModelSim, Questa or Vivado (any language)" },
+          ],
           step: STEPS.map((s, i) => ({ "@type": "HowToStep", position: i + 1, name: s.title, url: `${SITE.url}/workbench/${s.slug}` })),
         }}
       />
@@ -46,8 +54,9 @@ export default function GuidePage() {
         <h1>Guide</h1>
         <p>Everything you need to take a program from source to a verdict on your RTL.</p>
         <p className="small muted">
-          Short on time? <Link href="/try">Run the demo</Link> (one click, no files), or drop your files on the{" "}
-          <Link href="/">home page</Link> and Pipelith opens each one where it belongs. Reference pages:{" "}
+          New to processor design? Start with <Link href="/docs/start">Getting started</Link>. Short on time?{" "}
+          <Link href="/try">Run the demo</Link> (one click, no files), or drop your files on the <Link href="/">home page</Link> and
+          Pipelith opens each one where it belongs. Reference pages:{" "}
           <Link href="/docs/checks">check comments</Link>, <Link href="/docs/review-rules">review rules</Link>,{" "}
           <Link href="/docs/troubleshooting">troubleshooting</Link>, <Link href="/docs/glossary">glossary</Link>.
         </p>
@@ -126,10 +135,11 @@ export default function GuidePage() {
                   </tr>
                   <tr>
                     <td>
-                      <code>.zip</code>, folder or <code>.vhd</code> files
+                      <code>.zip</code>, folder or source files (<code>.vhd</code>, <code>.v</code>, <code>.sv</code> and
+                      headers)
                     </td>
                     <td>Code review</td>
-                    <td>Your whole VHDL design, including packages. Other files are ignored; .asm files are listed.</td>
+                    <td>Your whole design in VHDL, Verilog or SystemVerilog (or a mix), including packages and headers. Other files are ignored; .asm files are listed.</td>
                     <td>1,500 files, 2 MB each, 50 MB zip</td>
                   </tr>
                   <tr>
@@ -152,8 +162,9 @@ export default function GuidePage() {
             <h2>How a validation run works</h2>
             <p>
               The workbench holds two models of the same processor. The <strong>reference model</strong> executes the ISA
-              exactly as written, one instruction per step, with no pipeline. Your <strong>hardware</strong> is the VHDL
-              design, simulated in GHDL or ModelSim. Because a pipeline commits results at different cycles, the two are
+              exactly as written, one instruction per step, with no pipeline. Your <strong>hardware</strong> is your RTL — VHDL,
+              Verilog or SystemVerilog — simulated in GHDL, Icarus Verilog, Verilator, ModelSim/Questa or Vivado. Because a
+              pipeline commits results at different cycles, the two are
               compared by the <em>sequence of values</em> each register, the stack pointer, the flags and the OUT port take
               — not by timing.
             </p>
@@ -232,11 +243,60 @@ export default function GuidePage() {
             </ul>
           </section>
 
+          <section id="language" className="stack stack--tight">
+            <h2>VHDL, Verilog or SystemVerilog</h2>
+            <p>
+              Choose your design language with <strong>HDL</strong> at the top of any page. It is one setting for the whole site:
+              the hardware kit writes its testbench and scripts in that language, <em>Try the reference processor</em> loads a
+              design in it, and examples in the docs switch to it. Code review always reads every language it finds, so mixed
+              designs work.
+            </p>
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th scope="col">Language</th>
+                    <th scope="col">Files</th>
+                    <th scope="col">Free simulators</th>
+                    <th scope="col">Bundled reference design</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>VHDL (IEEE 1076-2008)</td>
+                    <td>
+                      <code>.vhd</code>, <code>.vhdl</code>
+                    </td>
+                    <td>GHDL</td>
+                    <td>6 stages (IF ID EX1 EX2 MEM WB)</td>
+                  </tr>
+                  <tr>
+                    <td>Verilog (IEEE 1364-2005)</td>
+                    <td>
+                      <code>.v</code>, headers <code>.vh</code>
+                    </td>
+                    <td>Icarus Verilog, Verilator</td>
+                    <td>5 stages (IF ID EX MEM WB)</td>
+                  </tr>
+                  <tr>
+                    <td>SystemVerilog (IEEE 1800-2017)</td>
+                    <td>
+                      <code>.sv</code>, headers <code>.svh</code>
+                    </td>
+                    <td>Icarus Verilog (-g2012), Verilator</td>
+                    <td>5 stages (the Verilog design in SystemVerilog style)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>ModelSim/Questa and the Vivado simulator handle all three.</p>
+          </section>
+
           <section id="review" className="stack stack--tight">
             <h2>Code review</h2>
             <p>
-              On the <Link href="/review">Code review</Link> page, upload your VHDL as a .zip, a folder or individual files. The
-              review parses every file and checks the following (every rule is listed in{" "}
+              On the <Link href="/review">Code review</Link> page, upload your VHDL, Verilog or SystemVerilog as a .zip, a folder
+              or individual files. The review parses every file and checks the following (every rule is listed in{" "}
               <Link href="/docs/review-rules">Code review rules</Link>):
             </p>
             <ul>
@@ -256,16 +316,31 @@ export default function GuidePage() {
               <li>
                 <strong>Processes</strong> — incomplete sensitivity lists, latches, logic outside the clock edge, missing
                 clock or asynchronous reset in the list, <code>case</code> without <code>when others</code>, mixed reset
-                polarity, delays in RTL.
+                polarity, delays in RTL. In Verilog: blocking (<code>=</code>) assignments in clocked blocks, non-blocking (
+                <code>&lt;=</code>) ones in combinational logic, both on one variable, <code>always</code> without events, and a
+                reset tested with the wrong polarity.
               </li>
               <li>
                 <strong>Pipeline</strong> — the registers, stages, forwarding and hazard units expected for the selected depth,
                 and fields latched by a pipeline register but never passed on.
               </li>
               <li>
-                <strong>Style</strong> — non-standard arithmetic packages, unconstrained integers, initial values, file names.
+                <strong>Style</strong> — non-standard arithmetic packages, unconstrained integers, initial values, file names;
+                in Verilog also <code>casex</code>, missing <code>`timescale</code> in some files, and no{" "}
+                <code>`default_nettype none</code>.
               </li>
             </ul>
+            <p>
+              Verilog adds connection checks of its own: wires assigned in <code>always</code> blocks, <code>reg</code>s driven
+              by <code>assign</code>, and undeclared names that silently become 1-bit wires. Macros (<code>`define</code>),{" "}
+              <code>`ifdef</code> and <code>`include</code> are expanded first, so the review sees what the compiler sees.
+            </p>
+            <p>
+              After an upload, a <strong>structure check</strong> says whether the upload looks like one complete design. If it
+              doesn&apos;t — missing packages or headers, a unit nobody defines, two copies of one — it offers a ready-made prompt
+              you can paste into any AI assistant to reorganise the files. The prompt lists your file names and the problems, never
+              your code, and Pipelith doesn&apos;t send it anywhere.
+            </p>
             <p>
               Every finding has a file and line, the reason it matters, and a suggested fix (often with code). The Design
               overview shows the hierarchy and a dependency-ordered compile list, which you can send to the hardware kit.
@@ -276,8 +351,8 @@ export default function GuidePage() {
           <section id="zip" className="stack stack--tight">
             <h2>Structuring the .zip for code review</h2>
             <p>
-              Put every VHDL file of one design — including all packages and components — in one folder, then zip it. The
-              details, an example layout and instructions for each operating system:
+              Put every source file of one design — including all packages, headers and components — in one folder, then zip it.
+              The details, an example layout for your language and instructions for each operating system:
             </p>
             <ZipGuide open />
           </section>
@@ -332,25 +407,101 @@ SETC             #this statement shouldn't be executed`}</pre>
             </p>
           </section>
 
+          <section id="waveforms" className="stack stack--tight">
+            <h2>Expected waveforms</h2>
+            <p>
+              An expected waveform is what a correct design with your depth and forwarding should show for a program: clock,
+              reset, the fetch PC, every register, SP, the flags, OUT, memory writes and the instruction in each stage, cycle by
+              cycle. Pipelith builds it from the reference model and the timing estimate — no simulator or RTL needed — as a
+              standard VCD you can open in GTKWave or Surfer next to your own.
+            </p>
+            <ul>
+              <li>
+                <strong>For the open program:</strong> <em>Download expected waveform (.vcd)</em> under Pipeline timing in{" "}
+                <Link href="/workbench/simulate">Simulate</Link>.
+              </li>
+              <li>
+                <strong>For the standard tests:</strong> <Link href="/waveforms">Standard test waveforms</Link> has the expected
+                waveforms for 5 and 6 stages, and real simulations of both reference designs.
+              </li>
+            </ul>
+            <p>
+              Values appear when the producing instruction reaches the stage that writes them: registers and OUT at write-back,
+              flags at execute, SP and memory in the memory stage. Your design may differ by a cycle here and there — the Compare
+              step checks the order of values, not the exact cycle.
+            </p>
+          </section>
+
           <section id="hardware" className="stack stack--tight">
             <h2>Running your hardware</h2>
             <p>
               In <Link href="/workbench/compare">Compare</Link>, set the RTL folder (relative to where you unzip the kit) and
-              download it. It contains <code>program.mem</code>, <code>tb_processor.vhd</code> and two scripts.
+              download it. It contains <code>program.mem</code>, a testbench in your design language and scripts for the
+              simulators that read it.
             </p>
-            <h3>GHDL</h3>
-            <pre className="code-block">{`unzip program-hardware-run.zip -d run && cd run
+            <HdlTabs
+              label="Simulator instructions by language"
+              panels={{
+                vhdl: (
+                  <>
+                    <h3>GHDL</h3>
+                    <pre className="code-block">{`unzip program-hardware-run.zip -d run && cd run
 chmod +x run_ghdl.sh
 ./run_ghdl.sh ../risc-pipelined-processor/src/rtl`}</pre>
-            <h3>ModelSim or Questa</h3>
-            <pre className="code-block">{`# edit "set RTL ..." at the top of run_modelsim.do, then in the transcript:
+                    <h3>ModelSim or Questa</h3>
+                    <pre className="code-block">{`# edit "set RTL ..." at the top of run_modelsim.do, then in the transcript:
 do run_modelsim.do`}</pre>
-            <h3>Vivado simulator</h3>
-            <pre className="code-block">{`# after compiling the RTL and tb_processor.vhd (VHDL-2008):
+                    <h3>Vivado simulator</h3>
+                    <pre className="code-block">{`# after compiling the RTL and tb_processor.vhd (VHDL-2008):
 open_vcd wave.vcd
 log_vcd [get_objects -r /tb_processor/*]
 run all
 close_vcd`}</pre>
+                  </>
+                ),
+                verilog: (
+                  <>
+                    <h3>Icarus Verilog</h3>
+                    <pre className="code-block">{`unzip program-hardware-run.zip -d run && cd run
+chmod +x run_icarus.sh
+./run_icarus.sh path/to/your/rtl`}</pre>
+                    <h3>Verilator 5</h3>
+                    <pre className="code-block">{`chmod +x run_verilator.sh
+./run_verilator.sh path/to/your/rtl     # builds obj_dir/Vtb_processor, then runs it`}</pre>
+                    <h3>ModelSim or Questa</h3>
+                    <pre className="code-block">{`# edit "set RTL ..." at the top of run_modelsim.do, then in the transcript:
+do run_modelsim.do`}</pre>
+                    <h3>Vivado simulator</h3>
+                    <pre className="code-block">{`xvlog -i path/to/your/rtl <your .v files> tb_processor.v
+xelab tb_processor -s tb
+xsim tb -runall                 # the testbench writes wave.vcd itself`}</pre>
+                  </>
+                ),
+                systemverilog: (
+                  <>
+                    <h3>Icarus Verilog</h3>
+                    <pre className="code-block">{`unzip program-hardware-run.zip -d run && cd run
+chmod +x run_icarus.sh
+./run_icarus.sh path/to/your/rtl        # compiles with -g2012`}</pre>
+                    <h3>Verilator 5</h3>
+                    <pre className="code-block">{`chmod +x run_verilator.sh
+./run_verilator.sh path/to/your/rtl`}</pre>
+                    <h3>ModelSim or Questa</h3>
+                    <pre className="code-block">{`# edit "set RTL ..." at the top of run_modelsim.do (it uses vlog -sv), then:
+do run_modelsim.do`}</pre>
+                    <h3>Vivado simulator</h3>
+                    <pre className="code-block">{`xvlog -sv -i path/to/your/rtl <your .sv files> tb_processor.sv
+xelab tb_processor -s tb
+xsim tb -runall`}</pre>
+                  </>
+                ),
+              }}
+            />
+            <p>
+              The Verilog and SystemVerilog testbenches read the fetch PC through a hierarchical reference (
+              <code>uut.pc_out</code>) and expect the interrupt input to be called <code>intr</code>, because SystemVerilog
+              reserves <code>int</code>. Edit the names at the top of the testbench if yours differ.
+            </p>
             <p>
               The testbench holds reset over a full falling and rising edge (the reference design loads PC from M[0] on that
               pair of edges), drives IN.PORT from the fetch PC so every IN reads the value the model used, and pulses the
@@ -393,6 +544,16 @@ close_vcd`}</pre>
             </p>
           </section>
 
+          <section id="display" className="stack stack--tight">
+            <h2>Display and accessibility</h2>
+            <p>
+              <strong>Display</strong> at the top of every page sets the colours (light, dark or your device&apos;s setting), a
+              larger text size, the typeface — Recursive, or Atkinson Hyperlegible, designed for readers with low vision — and
+              whether anything moves. The choices are kept in this browser. Everything works with a keyboard and a screen reader;
+              see the <Link href="/accessibility">accessibility statement</Link>.
+            </p>
+          </section>
+
           <section id="privacy" className="stack stack--tight">
             <h2>Privacy and security</h2>
             <ul>
@@ -404,7 +565,12 @@ close_vcd`}</pre>
               </li>
               <li>Files you open are read in the browser. Nothing is uploaded; the server only serves the app.</li>
               <li>
-                Your session is kept in this browser&apos;s local storage. Clearing site data removes it.
+                Your session and display preferences are kept in this browser&apos;s local storage. Clearing site data removes
+                them.
+              </li>
+              <li>
+                The AI restructuring prompt is only copied to your clipboard or downloaded; Pipelith never sends it to any AI
+                service.
               </li>
               <li>
                 Share links carry the program after <code>#</code>, the part of a URL browsers do not send to servers.
@@ -414,8 +580,8 @@ close_vcd`}</pre>
                 HTML.
               </li>
               <li>
-                The generated scripts only call <code>ghdl</code> or ModelSim on files in the kit and the folder you name.
-                Read them before running — they are short.
+                The generated scripts only call the simulator (<code>ghdl</code>, <code>iverilog</code>, <code>verilator</code>{" "}
+                or ModelSim) on files in the kit and the folder you name. Read them before running — they are short.
               </li>
             </ul>
           </section>
@@ -429,6 +595,10 @@ close_vcd`}</pre>
               <li>
                 Interrupt timing in a pipeline differs from an instruction-level model, so interrupt tests are compared on a
                 best-effort basis.
+              </li>
+              <li>
+                Code review is static analysis. In Verilog, macros defined in files that aren&apos;t in the upload are unknown, so
+                the review is more careful (fewer “never used” notes) in files that use them.
               </li>
             </ul>
           </section>

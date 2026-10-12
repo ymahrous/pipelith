@@ -7,6 +7,8 @@ const PAGES: { path: string; priority: number; freq: "weekly" | "monthly" | "yea
   { path: "/workbench/program", priority: 0.9, freq: "monthly" },
   { path: "/guide", priority: 0.8, freq: "monthly" },
   { path: "/docs", priority: 0.8, freq: "monthly" },
+  { path: "/docs/start", priority: 0.8, freq: "monthly" },
+  { path: "/waveforms", priority: 0.7, freq: "monthly" },
   { path: "/docs/checks", priority: 0.6, freq: "monthly" },
   { path: "/docs/review-rules", priority: 0.7, freq: "monthly" },
   { path: "/docs/troubleshooting", priority: 0.7, freq: "monthly" },
@@ -15,6 +17,7 @@ const PAGES: { path: string; priority: number; freq: "weekly" | "monthly" | "yea
   { path: "/isa", priority: 0.6, freq: "monthly" },
   { path: "/privacy", priority: 0.3, freq: "yearly" },
   { path: "/terms", priority: 0.3, freq: "yearly" },
+  { path: "/accessibility", priority: 0.3, freq: "yearly" },
   { path: "/license", priority: 0.2, freq: "yearly" },
 ];
 

@@ -96,9 +96,9 @@ function Scope() {
 const STEP_TEXT: Record<string, string> = {
   program: "Load one of the bundled tests, an .asm or .mem file, or write your own.",
   assemble: "Bit-exact with the project's assembler, plus warnings for silent mistakes.",
-  simulate: "Step through the reference ISA model; set IN values, interrupts and options.",
+  simulate: "Step through the reference ISA model; see the pipeline timing and download the expected waveform.",
   check: "Comments such as #R1=5 or C --> 1 become checks automatically.",
-  compare: "Download a testbench, run GHDL or ModelSim, drop in wave.vcd.",
+  compare: "Download a testbench in your HDL, run GHDL, Icarus, Verilator or ModelSim, drop in wave.vcd.",
   report: "Export Markdown or JSON, or share the setup as a link.",
 };
 
@@ -124,15 +124,18 @@ export default function Home() {
           license: "https://opensource.org/licenses/MIT",
           author: { "@type": "Person", name: SITE.author },
           featureList: [
-            "VHDL code review with suggested fixes",
+            "Code review for VHDL, Verilog and SystemVerilog with suggested fixes",
+            "AI-assistant prompt to reorganise a badly structured upload",
             "5- and 6-stage pipeline support with configurable forwarding",
             "Assembler compatible with the reference assembler",
             "Reference instruction-set model with time-travel stepping",
-            "Pipeline timing estimate and diagram",
+            "Pipeline timing estimate, diagram and expected waveforms",
             "VCD waveform and final-register comparison",
-            "GHDL and ModelSim testbench generation",
+            "Testbench and script generation for GHDL, Icarus Verilog, Verilator and ModelSim",
+            "Accessible: keyboard and screen reader, dark mode, larger text, high-legibility typeface",
             "Runs entirely in the browser, no account",
           ],
+          programmingLanguage: ["VHDL", "Verilog", "SystemVerilog"],
         }}
       />
       <section className="hero" aria-labelledby="hero-h">
@@ -142,8 +145,8 @@ export default function Home() {
           </p>
           <h1 id="hero-h">Find where your processor stops agreeing with its ISA.</h1>
           <p className="hero__lede">
-            Run a program on a reference model of the instruction set, simulate your VHDL with a generated testbench, and
-            see the first register, flag or fetch where the two part ways.
+            Run a program on a reference model of the instruction set, simulate your VHDL, Verilog or SystemVerilog with a
+            generated testbench, and see the first register, flag or fetch where the two part ways.
           </p>
           <div className="btn-row">
             <Link className="btn btn--primary" href="/try">
@@ -158,7 +161,7 @@ export default function Home() {
           </div>
           <p className="muted small hero__fine">
             The demo needs no files and shows results in one click. No account; works with 5- and 6-stage designs; everything
-            runs in this browser tab.
+            runs in this browser tab. New to processor design? <Link href="/docs/start">Start here</Link>.
           </p>
         </div>
         <Scope />
@@ -174,11 +177,11 @@ export default function Home() {
         <div className="band__inner">
           <h2 id="what-h">What is Pipelith?</h2>
           <p className="definition">
-            Pipelith is a free, browser-based tool for students and engineers who build pipelined RISC processors
-            in VHDL. It reviews your code and suggests fixes, runs programs on a reference model of the instruction set,
-            estimates how many cycles your 5- or 6-stage pipeline should take with the forwarding you have, and compares your
-            simulator&apos;s waveform with the model to pinpoint the first wrong register, flag or fetch. No account is
-            needed and your files stay on your device.
+            Pipelith is a free, browser-based tool for students and engineers who build pipelined RISC processors in VHDL,
+            Verilog or SystemVerilog. It reviews your code and suggests fixes, runs programs on a reference model of the
+            instruction set, estimates how many cycles your 5- or 6-stage pipeline should take with the forwarding you have,
+            shows the waveform a correct design should produce, and compares your simulator&apos;s waveform with the model to
+            pinpoint the first wrong register, flag or fetch. No account is needed and your files stay on your device.
           </p>
         </div>
       </section>

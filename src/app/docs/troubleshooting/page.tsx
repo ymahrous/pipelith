@@ -4,7 +4,7 @@ import { DocPage } from "@/components/DocPage";
 import { PROBLEM_GROUPS, PROBLEMS } from "@/lib/content/troubleshooting";
 
 const DESCRIPTION =
-  "Fixes for common Pipelith problems: .zip uploads, missing packages, assembler errors, GHDL and ModelSim compile order, VHDL-2008, unmapped signals, short waveforms and timing differences.";
+  "Fixes for common Pipelith problems: .zip uploads and the structure check, missing packages and headers, assembler errors, GHDL, Icarus Verilog, Verilator and ModelSim compile problems, VHDL-2008, unmapped signals, short waveforms and timing differences.";
 
 export const metadata: Metadata = {
   title: "Troubleshooting",

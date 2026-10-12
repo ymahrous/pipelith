@@ -15,7 +15,8 @@ import { judgeTiming } from "@/lib/compare/compare";
 import { MAX_FINAL_VALUES_CHARS } from "@/lib/session/session";
 import { readTextFile } from "@/lib/util/download";
 import { FileDrop } from "../FileDrop";
-import { fetchSampleWave } from "../useQuickStart";
+import { HDL_INFO } from "@/lib/hdl";
+import { fetchSampleWave, SAMPLE_DESIGNS } from "../useQuickStart";
 import { useWorkbench } from "../SessionProvider";
 import { StepFrame } from "../StepFrame";
 import { Badge, Empty, hx } from "../ui";
@@ -305,19 +306,24 @@ export function CompareStep() {
         compileOrder: session.compileOrder,
         stages: session.stages,
         forwardingNote: describeForwarding(geometry(session.stages), session.forwarding),
+        hdl: session.hdl,
       }),
-    [analysis.profile, analysis.inputs, session.interrupts, cycles, session.rtlRoot, session.compileOrder, session.stages, session.forwarding],
+    [analysis.profile, analysis.inputs, session.interrupts, cycles, session.rtlRoot, session.compileOrder, session.stages, session.forwarding, session.hdl],
   );
+  const hdl = HDL_INFO[session.hdl];
+  const verilogKit = session.hdl !== "vhdl";
+  const sampleDesign = SAMPLE_DESIGNS[session.stages];
 
   // "Bundled sample" needs no files: load the matching waveform as soon as the option is shown.
   const autoLoaded = useRef<string | null>(null);
   useEffect(() => {
     if (method !== "sample" || !example || !sim || wave.progress !== null) return;
-    const have = wave.origin === "sample" && wave.name.startsWith(`${example.id}.vcd`);
-    if (have || autoLoaded.current === example.id) return;
-    autoLoaded.current = example.id;
-    fetchSampleWave(example.id)
-      .then((b) => loadWave(b, `${example.id}.vcd (GHDL, reference RTL)`, "sample", session.stages))
+    const key = `${example.id}.vcd (${SAMPLE_DESIGNS[session.stages].label})`;
+    const have = wave.origin === "sample" && wave.name === key;
+    if (have || autoLoaded.current === key) return;
+    autoLoaded.current = key;
+    fetchSampleWave(example.id, session.stages)
+      .then((b) => loadWave(b, key, "sample", session.stages))
       .catch(() => toast("Could not load the sample waveform."));
   }, [method, example, sim, wave.progress, wave.origin, wave.name, loadWave, toast, session.stages]);
 
@@ -344,7 +350,7 @@ export function CompareStep() {
 
   const loadSample = async (id: string) => {
     try {
-      await loadWave(await fetchSampleWave(id), `${id}.vcd (GHDL, reference RTL)`, "sample");
+      await loadWave(await fetchSampleWave(id, session.stages), `${id}.vcd (${sampleDesign.label})`, "sample");
     } catch {
       toast("Could not load the sample waveform.");
     }
@@ -411,9 +417,10 @@ export function CompareStep() {
               <section className="stack stack--tight" aria-labelledby="kit-h">
                 <h2 id="kit-h">Make the waveform</h2>
                 <p className="muted small prose">
-                  The kit contains <code>program.mem</code> (this program), <code>tb_processor.vhd</code> (a VHDL-2008
-                  testbench that feeds each IN instruction the value the model used) and scripts for GHDL and
-                  ModelSim/Questa. Running a script writes <code>wave.vcd</code>.
+                  The kit contains <code>program.mem</code> (this program), <code>tb_processor{hdl.tbExt}</code> (a {hdl.label}{" "}
+                  testbench that feeds each IN instruction the value the model used) and scripts for{" "}
+                  {verilogKit ? "Icarus Verilog, Verilator and ModelSim/Questa" : "GHDL and ModelSim/Questa"}. Running a script writes{" "}
+                  <code>wave.vcd</code>. Kit language: <strong>{hdl.label}</strong> — change it at the top of the page.
                 </p>
                 <div className="btn-row">
                   <label className="field">
@@ -430,7 +437,7 @@ export function CompareStep() {
                         else setRtl(session.rtlRoot);
                       }}
                     />
-                    <span className="field__hint">Where your .vhd files are, relative to the unzipped kit</span>
+                    <span className="field__hint">Where your {hdl.extensions.join("/")} files are, relative to the unzipped kit</span>
                   </label>
                   <label className="field">
                     <span className="field__label">Clock cycles</span>
@@ -464,8 +471,9 @@ export function CompareStep() {
                     </>
                   ) : (
                     <>
-                      Compile order: the reference processor&apos;s {analysis.profile.hardware.compileOrder.length} files. For your own
-                      design, run <Link href="/review">Code review</Link> first and it will fill this in.
+                      Compile order: the {verilogKit ? "5-stage Verilog" : "6-stage VHDL"} reference processor&apos;s{" "}
+                      {verilogKit ? (analysis.profile.hardware.verilog?.compileOrder.length ?? 0) : analysis.profile.hardware.compileOrder.length} files. For
+                      your own design, run <Link href="/review">Code review</Link> first and it will fill this in.
                     </>
                   )}
                 </p>
@@ -476,11 +484,20 @@ export function CompareStep() {
                 ))}
                 <details>
                   <summary className="small">Commands</summary>
-                  <pre className="code-block">{`unzip ${slug(session.name)}-hardware-run.zip -d run && cd run
+                  <pre className="code-block">
+                    {verilogKit
+                      ? `unzip ${slug(session.name)}-hardware-run.zip -d run && cd run
+chmod +x run_icarus.sh && ./run_icarus.sh path/to/rtl        # Icarus Verilog
+chmod +x run_verilator.sh && ./run_verilator.sh path/to/rtl  # or Verilator 5
+
+# or, in ModelSim / Questa (edit RTL at the top first):
+do run_modelsim.do`
+                      : `unzip ${slug(session.name)}-hardware-run.zip -d run && cd run
 chmod +x run_ghdl.sh && ./run_ghdl.sh path/to/src/rtl
 
 # or, in ModelSim / Questa (edit RTL at the top first):
-do run_modelsim.do`}</pre>
+do run_modelsim.do`}
+                  </pre>
                 </details>
               </section>
             </li>
@@ -491,7 +508,7 @@ do run_modelsim.do`}</pre>
                   <FileDrop
                     accept=".vcd,.gz"
                     label="Choose wave.vcd"
-                    hint="From GHDL, ModelSim, Questa, Vivado or Icarus. Read in this tab only; nothing is uploaded to a server."
+                    hint="From GHDL, Icarus Verilog, Verilator, ModelSim, Questa or Vivado. Read in this tab only; nothing is uploaded to a server."
                     onFile={(f) => loadWave(f, f.name, "upload")}
                   />
                 )}
@@ -629,8 +646,11 @@ do run_modelsim.do`}</pre>
             <strong>You need nothing</strong>
             <ul>
               <li>
-                Each bundled test program comes with a waveform of the reference RTL running it in GHDL 4.1, made with the
-                same kit you can download.
+                Each bundled test program comes with waveforms of two reference designs, made with the same kit you can download:
+                the 6-stage VHDL processor in GHDL 4.1, and the 5-stage Verilog processor in Icarus Verilog 12.
+              </li>
+              <li>
+                The one for your pipeline depth is used: {session.stages} stages → {sampleDesign.design} ({sampleDesign.sim}).
               </li>
             </ul>
           </div>
