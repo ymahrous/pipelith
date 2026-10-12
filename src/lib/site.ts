@@ -18,7 +18,7 @@ export const SITE = {
   description:
     "Pipelith is a free, browser-based tool to validate and test pipelined RISC processors written in VHDL, Verilog or SystemVerilog: review the code with suggested fixes, assemble and simulate programs on a reference ISA model, generate expected waveforms, and compare your simulation's waveform against the model. Supports 5- and 6-stage pipelines. No login; your files never leave the browser.",
   author: "Yousef Mahrous",
-  repo: "https://github.com/ymahrous/risc-pipelined-processor",
+  repo: "https://github.com/ymahrous/pipelith",
   legalUpdated: "2026-10-12",
   legalUpdatedText: "12 October 2026",
 };
